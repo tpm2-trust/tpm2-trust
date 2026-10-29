@@ -8,6 +8,7 @@ use (
 	./assh
 	./tpm2-kira
 	./tpm2-kira-vault
+	./tpm2-verifier
 	./tpm2-kira/core
 )
 
@@ -15,3 +16,7 @@ use (
 // (./core, the vault's submodule ./tpm2-kira/core): here both take the
 // checkout.
 replace github.com/mrwiora/tpm2-kira/core v0.0.0 => ./tpm2-kira/core
+
+// tpm2-verifier, the core's EK root store: tpm2-kira's submodule and, in the
+// vault, that submodule's - here the checkout.
+replace github.com/tpm2-trust/tpm2-verifier v0.0.0 => ./tpm2-verifier

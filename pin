@@ -12,6 +12,8 @@
 #   ./pin assh          tpm2-kira/assh and safearch/assh to assh's HEAD
 #   ./pin tpm2-kira     marify's core.properties and the vault's submodule
 #                       tpm2-kira/ (its core) to tpm2-kira's HEAD
+#   ./pin tpm2-verifier tpm2-kira/tpm2-verifier (the core's EK root store)
+#                       to tpm2-verifier's HEAD
 #
 # go-tpm is pinned in go.mod (tpm2-kira's version, assh's replace) by intent
 # and is shown, not moved.
@@ -25,6 +27,7 @@ SUBMODULES=(
     "tpm2-kira assh assh"
     "safearch assh assh"
     "tpm2-kira-vault tpm2-kira tpm2-kira"
+    "tpm2-kira tpm2-verifier tpm2-verifier"
 )
 
 red() { printf '\033[31m%s\033[0m' "$*"; }
@@ -81,6 +84,24 @@ status() {
     return 0
 }
 
+# nested DIR: the submodules of the pinned checkout in DIR (tpm2-kira's
+# assh/ and tpm2-verifier/ inside the vault's tpm2-kira/), at the commits
+# it records, from the workspace's checkouts of the same name - their
+# remotes may not have those commits yet.
+nested() {
+    local dir=$1 mode sha sub
+    while read -r mode _ sha sub; do
+        [[ $mode == 160000 && -d $ROOT/$sub/.git ]] || continue
+        git -C "$dir" submodule init -q -- "$sub" 2>/dev/null || true
+        if [[ ! -e $dir/$sub/.git ]]; then
+            rm -rf "${dir:?}/$sub"
+            git clone -q --no-checkout "$ROOT/$sub" "$dir/$sub"
+        fi
+        git -C "$dir/$sub" fetch -q "$ROOT/$sub" "+refs/heads/*:refs/remotes/workspace/*"
+        git -C "$dir/$sub" checkout -q --detach "$sha"
+    done < <(git -C "$dir" ls-tree HEAD)
+}
+
 # pin_submodules CHECKOUT: every submodule that pins CHECKOUT to its HEAD.
 pin_submodules() {
     local co=$1
@@ -93,6 +114,7 @@ pin_submodules() {
         dirty "$ROOT/$consumer/$path" && die "$consumer/$path has changes of its own: move them to $co/ first"
         git -C "$ROOT/$consumer/$path" fetch -q "$ROOT/$checkout" "+refs/heads/*:refs/remotes/workspace/*"
         git -C "$ROOT/$consumer/$path" checkout -q --detach "$sha"
+        nested "$ROOT/$consumer/$path"
         git -C "$ROOT/$consumer" add "$path"
         echo "$consumer: $path at $(short "$ROOT/$co" "$sha"), staged - commit it in $consumer"
     done
@@ -111,6 +133,7 @@ pin_kira() {
 case "${1:-status}" in
 status) status ;;
 assh) pin_submodules assh ;;
+tpm2-verifier) pin_submodules tpm2-verifier ;;
 tpm2-kira) pin_kira ;;
-*) die "usage: pin [status | assh | tpm2-kira]" ;;
+*) die "usage: pin [status | assh | tpm2-kira | tpm2-verifier]" ;;
 esac
