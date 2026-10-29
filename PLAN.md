@@ -39,15 +39,20 @@ follow, and remove the duplicates, before more is built on top.
       (`github.com/mrwiora/tpm2-kira/core`), holding `attest/`,
       `transport/`, `vaultproto/`, `mobile/`. tpm2-kira requires it
       (`replace ./core`), `go.work` uses it; the vault and Marify require
-      the core alone. Marify's build-core drops its go.mod edit. An import
-      test keeps the core free of tpm2-kira's `internal/` and of aSSH.
+      the core alone. Marify's build-core drops its go.mod edit. The
+      module boundary keeps the core free of tpm2-kira's `internal/` and
+      of aSSH (it cannot import what its go.mod does not require).
+      Done: tpm2-kira 86340f0, the vault 6c8c112, Marify 95ea722, the
+      workspace e9d75fd; tpm2-kira's and the core's suites pass, the vault's
+      too; Marify's Android run against it - see below.
 - [ ] 2. **The vault pins the core**: a commit in the vault's go.mod (a
       pseudo-version of the core module, as tpm2-kira pins go-tpm), moved by
       `./pin core`; `go.work` gives the checkout for development.
 - [ ] 3. **One EK root store and verifier**: tpm2-verifier's `verify`
       package and vendor data become what the phone core and tpm2-kira
       check EK chains with; the phone app keeps embedding the data at build
-      time (nothing added at runtime). Needs (open question 2).
+      time (nothing added at runtime). Decided: tpm2-verifier is the EK
+      root store - the vendor roots are curated there from now on.
 - [ ] 4. **One go-tpm**: tpm2-verifier on the same go-tpm as the others
       (`36f2059`), and `./pin status` warns when two projects' go-tpm differ.
 - [ ] 5. **`pin` reads its pins from a manifest** (`pins.conf`: consumer,
@@ -59,15 +64,13 @@ follow, and remove the duplicates, before more is built on top.
 
 ## Open questions
 
-1. Step 1: the core inside tpm2-kira's repository (a second module there,
-   tagged `core/vX`), or a repository of its own (`tpm2-trust/kira-core`)?
-   Inside keeps one history and one review; its own makes the boundary
-   impossible to cross by accident. Recommended: inside.
-2. Step 3: tpm2-verifier's root store is a signed directory read at
-   runtime; the phone must not take roots at runtime. Is tpm2-verifier's
-   `verify` package to be used as a library with the data embedded
-   (`go:embed` of the same vendor files), and is tpm2-verifier the place
-   where vendor roots are curated from now on?
+1. ~~Step 1: inside tpm2-kira or its own repository?~~ Decided: inside.
+2. Step 3: tpm2-verifier is the EK root store (decided). Still open: its
+   store is a signed directory read at runtime, and the phone must not take
+   roots at runtime - so the phone core embeds tpm2-verifier's vendor data
+   at build time (`go:embed` through a package of tpm2-verifier's), and
+   tpm2-kira's `core/attest/ekroots/` goes. tpm2-verifier then becomes a
+   dependency of the core (go-tpm and yaml): acceptable for the phone?
 3. Step 4: may tpm2-verifier move to go-tpm `36f2059` (an unreleased
    upstream commit), or should everything wait for the next go-tpm
    release?
