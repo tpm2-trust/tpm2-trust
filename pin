@@ -15,8 +15,9 @@
 #   ./pin tpm2-verifier tpm2-kira/tpm2-verifier (the core's EK root store)
 #                       to tpm2-verifier's HEAD
 #
-# go-tpm is pinned in go.mod (tpm2-kira's version, assh's replace) by intent
-# and is shown, not moved.
+# go-tpm is required in every Go module's go.mod (aSSH's replace to the fork
+# reaches its tpmadmin alone): shown, compared - one version for all - and
+# moved by hand.
 
 set -euo pipefail
 
@@ -56,6 +57,29 @@ where() {
     fi
 }
 
+# GOTPM_MODULES are the Go modules here that require go-tpm: one version
+# for all, since the core, aSSH and tpm2-verifier end up in one binary.
+GOTPM_MODULES=(assh tpm2-kira tpm2-kira/core tpm2-kira-vault tpm2-verifier)
+
+# gotpm_status shows the go-tpm every module requires and warns when they
+# differ; aSSH's replace (the fork, for tpmadmin alone) is shown apart.
+gotpm_status() {
+    local m v first="" differ=false
+    for m in "${GOTPM_MODULES[@]}"; do
+        v="$(sed -n 's/^[[:space:]]*github.com\/google\/go-tpm \(v[^ ]*\).*$/\1/p' "$ROOT/$m/go.mod" | head -1)"
+        [[ -n $v ]] || continue
+        [[ -z $first ]] && first=$v
+        [[ $v == "$first" ]] || differ=true
+        printf '%-26s %s\n' "go-tpm ($m)" "$v"
+    done
+    printf '%-26s %s\n' "go-tpm (assh's replace)" "$(sed -n 's/^replace github.com\/google\/go-tpm => //p' "$ROOT/assh/go.mod") (tpmadmin alone)"
+    if $differ; then
+        echo "$(red "go-tpm differs between the modules: one version for all (go get github.com/google/go-tpm@<version> in each)")"
+    else
+        echo "go-tpm:                    $(green "one version in every module")"
+    fi
+}
+
 status() {
     local line consumer path checkout recorded staged actual
     for line in "${SUBMODULES[@]}"; do
@@ -75,8 +99,7 @@ status() {
     local kira
     kira="$(sed -n 's/^kira.commit=//p' "$ROOT/marify/core.properties")"
     printf '%-26s %s  %s\n' "marify core.properties" "${kira:0:7}" "$(where "$ROOT/tpm2-kira" "$kira")"
-    printf '%-26s %s\n' "go-tpm (tpm2-kira)" "$(sed -n 's/^\tgithub.com\/google\/go-tpm \(.*\)$/\1/p' "$ROOT/tpm2-kira/go.mod")"
-    printf '%-26s %s\n' "go-tpm (assh's replace)" "$(sed -n 's/^replace github.com\/google\/go-tpm => //p' "$ROOT/assh/go.mod")"
+    gotpm_status
     local repo
     for repo in assh tpm2-kira; do
         dirty "$ROOT/$repo" && echo "$(red "$repo/ has uncommitted changes: a pin takes its HEAD, not them")"

@@ -87,8 +87,10 @@ follow, and remove the duplicates, before more is built on top.
       (the bind screen), the workspace a935f5e. The signature: the
       mechanism checks `MANIFEST.sig` against `manifest/allowed_signers`,
       which names no key yet - open question 7.
-- [ ] 4. **One go-tpm**: tpm2-verifier on the same go-tpm as the others
+- [x] 4. **One go-tpm**: tpm2-verifier on the same go-tpm as the others
       (`36f2059`), and `./pin status` warns when two projects' go-tpm differ.
+      Done: tpm2-verifier 6537aad (its tests, swtpm included, pass),
+      `pin status` compares the go-tpm of every Go module.
 - [ ] 5. **`pin` reads its pins from a manifest** (`pins.conf`: consumer,
       kind - submodule, properties line, go.mod - target), so a new
       dependency is a line, not code; `pin status` lists them all.
@@ -105,9 +107,7 @@ follow, and remove the duplicates, before more is built on top.
    at build time (`go:embed` through a package of tpm2-verifier's), and
    tpm2-kira's `core/attest/ekroots/` goes. tpm2-verifier then becomes a
    dependency of the core (go-tpm and yaml): decided, acceptable.
-3. Step 4: may tpm2-verifier move to go-tpm `36f2059` (an unreleased
-   upstream commit), or should everything wait for the next go-tpm
-   release?
+3. ~~Step 4: go-tpm `36f2059` for tpm2-verifier too?~~ Decided: yes.
 4. Step 6: remove `mkinitcpio-systemd-extras/` from the workspace, or keep
    it as an unrelated checkout?
 6. Step 3: the core module would require tpm2-verifier. Today every pin

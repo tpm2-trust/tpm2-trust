@@ -112,7 +112,7 @@ flowchart LR
   MARIFY["marify"]
   SAFE["safearch"]
   VER["tpm2-verifier<br/>ekroots: the EK root store"]
-  GOTPM["go-tpm<br/>upstream 36f2059; fork for tpmadmin"]
+  GOTPM["go-tpm<br/>upstream 36f2059 everywhere; fork for tpmadmin"]
   KIRA -->|"submodule assh/ (pin)"| ASSH
   SAFE -->|"submodule assh/ (pin), the assh command"| ASSH
   KIRA --- CORE
@@ -120,7 +120,7 @@ flowchart LR
   MARIFY -->|"core.properties (pin), gomobile"| CORE
   CORE -->|"submodule tpm2-kira/tpm2-verifier (pin)"| VER
   ASSH & KIRA & VAULT --> GOTPM
-  VER -->|"go-tpm v0.9.8"| GOTPM
+  VER --> GOTPM
 ```
 
 | Consumer | Uses | How it is pinned | Moved by |
@@ -131,7 +131,7 @@ flowchart LR
 | Marify | the core's `mobile/kiracore` (and `kiratest`), with `attest/` and `transport/frame` | `core.properties` (a commit of tpm2-kira) | `./pin tpm2-kira` |
 | tpm2-kira-vault | the core's `attest/` and `vaultproto/` | submodule `tpm2-kira/`, `replace ./tpm2-kira/core` in go.mod | `./pin tpm2-kira` |
 | tpm2-kira's core (and so the phone and the vault) | tpm2-verifier's `ekroots` | submodule `tpm2-kira/tpm2-verifier`, `replace ../tpm2-verifier` in `core/go.mod` (and `./tpm2-verifier` in tpm2-kira's, `./tpm2-kira/tpm2-verifier` in the vault's) | `./pin tpm2-verifier` |
-| tpm2-kira, aSSH | go-tpm | a pseudo-version in go.mod (aSSH's `replace` to the fork reaches `tpmadmin` alone) | by hand, deliberately |
+| every Go module (aSSH, tpm2-kira, its core, the vault, tpm2-verifier) | go-tpm | one pseudo-version in each go.mod, the same everywhere: they end up in one binary (aSSH's `replace` to the fork reaches `tpmadmin` alone); `./pin status` warns when they differ | by hand, in every module at once |
 
 Rules of the direction:
 
