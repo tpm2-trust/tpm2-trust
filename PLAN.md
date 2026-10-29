@@ -94,8 +94,9 @@ follow, and remove the duplicates, before more is built on top.
 - [ ] 5. **`pin` reads its pins from a manifest** (`pins.conf`: consumer,
       kind - submodule, properties line, go.mod - target), so a new
       dependency is a line, not code; `pin status` lists them all.
-- [ ] 6. **mkinitcpio-systemd-extras out of the workspace** (archived, or
-      only kept as a reference): open question 4.
+- [x] 6. **mkinitcpio-systemd-extras out of the workspace**: it was a
+      reference only; the checkout is gone (its repository stays published).
+      hashpwd2 likewise: tpm2-kira's combiner test holds its known answer.
 - [ ] 7. AGENTS.md (workspace and the projects') follow each step.
 
 ## Open questions
@@ -108,8 +109,7 @@ follow, and remove the duplicates, before more is built on top.
    tpm2-kira's `core/attest/ekroots/` goes. tpm2-verifier then becomes a
    dependency of the core (go-tpm and yaml): decided, acceptable.
 3. ~~Step 4: go-tpm `36f2059` for tpm2-verifier too?~~ Decided: yes.
-4. Step 6: remove `mkinitcpio-systemd-extras/` from the workspace, or keep
-   it as an unrelated checkout?
+4. ~~Step 6: remove `mkinitcpio-systemd-extras/`?~~ Decided: removed.
 6. Step 3: the core module would require tpm2-verifier. Today every pin
    between projects is a git submodule, because nothing is pushed; a
    submodule `tpm2-verifier/` inside `tpm2-kira/core/` works offline but
@@ -117,10 +117,11 @@ follow, and remove the duplicates, before more is built on top.
    submodules). Pushing tpm2-verifier and tpm2-kira and pinning by Go
    pseudo-versions (`go.mod`, `go.sum`) is the plain Go way and needs no
    submodule anywhere - for the core, aSSH and the vault alike. Which?
-7. Step 3: `manifest/allowed_signers` names no key and `MANIFEST.sig` does
-   not exist, so the EK root data is checked against its manifest's hashes,
+7. Step 3 (unsigned is fine for now): `manifest/allowed_signers` names no
+   key and `MANIFEST.sig` does not exist, so the EK root data is checked against its manifest's hashes,
    not yet a signature. Whose ed25519 key signs it (`ssh-keygen -Y sign -n
    tpm2-verifier-vendors`)? Once its public key is in `allowed_signers`,
    `ekroots` uses signed data alone.
-5. Step 7 (findings 7): which remotes, and when to push - the submodule
-   pins only resolve for others once `assh/` is pushed.
+5. ~~Step 7: which remotes?~~ Decided: every project in
+   github.com/tpm2-trust, tpm2-kira and the go-tpm fork in mrwiora; the
+   workspace is tpm2-trust/tpm2-trust. Pushing is the owner's.

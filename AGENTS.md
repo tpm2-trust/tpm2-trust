@@ -98,8 +98,12 @@ AGENTS.md applies inside it and goes into detail; this file is the map.
 | `marify/` | Marify, the phone app: attests a boot over Bluetooth LE, keeps the phone salt | Kotlin (Android), Swift (iOS), the Go core bound with gomobile | APKs (`build-packages.sh apk`) |
 | `safearch/` | a read-only, signed Arch image (mkosi) whose identity is aSSH's | shell, mkosi | images, releases (`build.sh`, `release.sh`) |
 | `tpm2-verifier/` | EK certificate chains of TPM vendors; the curated EK root store every project uses (`ekroots`: the vendor data embedded, checked against its signed manifest) | Go, `github.com/tpm2-trust/tpm2-verifier` | binaries, packages; a library |
-| `go-tpm/` | the go-tpm fork (`NVChangeAuth`), for aSSH's `tpmadmin` | Go | - |
-| `mkinitcpio-systemd-extras/` | sd-network and sd-tinyssh hooks; no project here uses them any more (tpm2-kira's SSH server replaced them, tpm2-kira HISTORY.md) | shell | - |
+| `go-tpm/` | the go-tpm fork (`NVChangeAuth`, branch `feat/NVChangeAuth`: google/go-tpm#452), for aSSH's `tpmadmin`; dropped once upstream has it | Go | - |
+
+Where they are published: github.com/tpm2-trust/<directory> - this
+workspace as `tpm2-trust/tpm2-trust` - except tpm2-kira and the go-tpm
+fork, which are github.com/mrwiora/<directory>. A pin only resolves for
+others once the commit it names is on a published branch.
 
 ### How they depend on each other
 
