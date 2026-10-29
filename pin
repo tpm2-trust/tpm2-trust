@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# pin: the pins between the projects of this workspace.
+#
+# Each project is edited in its checkout here (assh/, tpm2-kira/, ...). A
+# project that uses another pins a commit of it - a submodule, or a line in
+# a file - and builds its releases from exactly that commit; go.work lets
+# development builds use the checkouts instead. This script shows where the
+# pins stand and moves them to a checkout's HEAD. It stages; committing is
+# the project's own step.
+#
+#   ./pin status        every pin, against the checkout it pins
+#   ./pin assh          tpm2-kira/assh and safearch/assh to assh's HEAD
+#   ./pin tpm2-kira     marify's core.properties to tpm2-kira's HEAD
+#
+# Pins that follow a checkout and need nothing: the vault's go.mod replaces
+# tpm2-kira with ../tpm2-kira. go-tpm is pinned in go.mod (tpm2-kira's
+# version, assh's replace) by intent and is shown, not moved.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# The submodules that pin a checkout of this workspace: "consumer path checkout".
+SUBMODULES=(
+    "tpm2-kira assh assh"
+    "safearch assh assh"
+)
+
+red() { printf '\033[31m%s\033[0m' "$*"; }
+green() { printf '\033[32m%s\033[0m' "$*"; }
+die() {
+    echo "pin: $*" >&2
+    exit 1
+}
+
+short() { git -C "$1" rev-parse --short "$2"; }
+dirty() { [[ -n "$(git -C "$1" status --porcelain)" ]]; }
+
+# where REPO SHA HEAD: how SHA stands to REPO's HEAD.
+where() {
+    local repo=$1 sha=$2
+    local head
+    head="$(git -C "$repo" rev-parse HEAD)"
+    if [[ $sha == "$head" ]]; then
+        green "at its HEAD"
+    elif ! git -C "$repo" cat-file -e "$sha^{commit}" 2>/dev/null; then
+        red "a commit $repo does not have (made in the submodule? fetch it into $repo)"
+    elif git -C "$repo" merge-base --is-ancestor "$sha" "$head"; then
+        red "$(git -C "$repo" rev-list --count "$sha..$head") commit(s) behind its HEAD"
+    else
+        red "not on its HEAD's history ($(git -C "$repo" branch --show-current || true) is elsewhere)"
+    fi
+}
+
+status() {
+    local line consumer path checkout recorded staged actual
+    for line in "${SUBMODULES[@]}"; do
+        read -r consumer path checkout <<<"$line"
+        recorded="$(git -C "$ROOT/$consumer" ls-tree HEAD "$path" | awk '{print $3}')"
+        staged="$(git -C "$ROOT/$consumer" ls-files -s "$path" | awk '{print $2}')"
+        actual="$(git -C "$ROOT/$consumer/$path" rev-parse HEAD)"
+        printf '%-26s %s  %s\n' "$consumer/$path" "$(short "$ROOT/$checkout" "$recorded" 2>/dev/null || echo "${recorded:0:7}")" "$(where "$ROOT/$checkout" "$recorded")"
+        [[ $staged == "$recorded" ]] || echo "    $(red "staged: ${staged:0:7}, not committed in $consumer")"
+        [[ $actual == "$staged" ]] || echo "    $(red "checked out: ${actual:0:7}, not the pin (git -C $consumer submodule update $path)")"
+        dirty "$ROOT/$consumer/$path" && echo "    $(red "changes in the submodule: edit $checkout/, not $consumer/$path")"
+    done
+    local kira
+    kira="$(sed -n 's/^kira.commit=//p' "$ROOT/marify/core.properties")"
+    printf '%-26s %s  %s\n' "marify core.properties" "${kira:0:7}" "$(where "$ROOT/tpm2-kira" "$kira")"
+    printf '%-26s %s\n' "tpm2-kira-vault" "follows ../tpm2-kira (go.mod replace)"
+    printf '%-26s %s\n' "go-tpm (tpm2-kira)" "$(sed -n 's/^\tgithub.com\/google\/go-tpm \(.*\)$/\1/p' "$ROOT/tpm2-kira/go.mod")"
+    printf '%-26s %s\n' "go-tpm (assh's replace)" "$(sed -n 's/^replace github.com\/google\/go-tpm => //p' "$ROOT/assh/go.mod")"
+    local repo
+    for repo in assh tpm2-kira; do
+        dirty "$ROOT/$repo" && echo "$(red "$repo/ has uncommitted changes: a pin takes its HEAD, not them")"
+    done
+    return 0
+}
+
+pin_assh() {
+    dirty "$ROOT/assh" && die "assh/ has uncommitted changes: commit them first"
+    local sha line consumer path checkout
+    sha="$(git -C "$ROOT/assh" rev-parse HEAD)"
+    for line in "${SUBMODULES[@]}"; do
+        read -r consumer path checkout <<<"$line"
+        dirty "$ROOT/$consumer/$path" && die "$consumer/$path has changes of its own: move them to assh/ first"
+        git -C "$ROOT/$consumer/$path" fetch -q "$ROOT/$checkout" "+refs/heads/*:refs/remotes/workspace/*"
+        git -C "$ROOT/$consumer/$path" checkout -q --detach "$sha"
+        git -C "$ROOT/$consumer" add "$path"
+        echo "$consumer: $path at $(short "$ROOT/assh" "$sha"), staged - commit it in $consumer"
+    done
+}
+
+pin_kira() {
+    dirty "$ROOT/tpm2-kira" && die "tpm2-kira/ has uncommitted changes: commit them first"
+    local sha
+    sha="$(git -C "$ROOT/tpm2-kira" rev-parse HEAD)"
+    sed -i "s/^kira.commit=.*/kira.commit=$sha/" "$ROOT/marify/core.properties"
+    git -C "$ROOT/marify" add core.properties
+    echo "marify: core.properties at tpm2-kira $(short "$ROOT/tpm2-kira" "$sha"), staged - commit it in marify"
+}
+
+case "${1:-status}" in
+status) status ;;
+assh) pin_assh ;;
+tpm2-kira) pin_kira ;;
+*) die "usage: pin [status | assh | tpm2-kira]" ;;
+esac

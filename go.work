@@ -1,0 +1,11 @@
+// The development workspace: building or testing one of these projects uses
+// the others' checkouts here, so a change to aSSH reaches tpm2-kira and the
+// vault without a commit. Releases never use it: they build the commits the
+// projects pin (GOWORK=off; ./pin status shows the pins).
+go 1.26.0
+
+use (
+	./assh
+	./tpm2-kira
+	./tpm2-kira-vault
+)

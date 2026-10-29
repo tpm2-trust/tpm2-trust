@@ -1,0 +1,9 @@
+# The workspace's own files only: every project here is a repository of
+# its own and is ignored.
+/*
+!/.gitignore
+!/AGENTS.md
+!/README.md
+!/go.work
+!/go.work.sum
+!/pin
