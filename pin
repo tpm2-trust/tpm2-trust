@@ -13,7 +13,7 @@
 #   ./pin tpm2-kira     marify's core.properties to tpm2-kira's HEAD
 #
 # Pins that follow a checkout and need nothing: the vault's go.mod replaces
-# tpm2-kira with ../tpm2-kira. go-tpm is pinned in go.mod (tpm2-kira's
+# tpm2-kira's core with ../tpm2-kira/core. go-tpm is pinned in go.mod (tpm2-kira's
 # version, assh's replace) by intent and is shown, not moved.
 
 set -euo pipefail
@@ -67,7 +67,7 @@ status() {
     local kira
     kira="$(sed -n 's/^kira.commit=//p' "$ROOT/marify/core.properties")"
     printf '%-26s %s  %s\n' "marify core.properties" "${kira:0:7}" "$(where "$ROOT/tpm2-kira" "$kira")"
-    printf '%-26s %s\n' "tpm2-kira-vault" "follows ../tpm2-kira (go.mod replace)"
+    printf '%-26s %s\n' "tpm2-kira-vault" "follows ../tpm2-kira/core (go.mod replace)"
     printf '%-26s %s\n' "go-tpm (tpm2-kira)" "$(sed -n 's/^\tgithub.com\/google\/go-tpm \(.*\)$/\1/p' "$ROOT/tpm2-kira/go.mod")"
     printf '%-26s %s\n' "go-tpm (assh's replace)" "$(sed -n 's/^replace github.com\/google\/go-tpm => //p' "$ROOT/assh/go.mod")"
     local repo

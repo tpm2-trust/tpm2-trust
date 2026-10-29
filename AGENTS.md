@@ -107,7 +107,7 @@ AGENTS.md applies inside it and goes into detail; this file is the map.
 flowchart LR
   ASSH["assh<br/>hostkey, server, persist, sandbox"]
   KIRA["tpm2-kira"]
-  CORE["tpm2-kira's shared core<br/>attest/, transport/, vaultproto/, mobile/"]
+  CORE["tpm2-kira/core: the shared core, a module of its own<br/>attest/, transport/, vaultproto/, mobile/"]
   VAULT["tpm2-kira-vault"]
   MARIFY["marify"]
   SAFE["safearch"]
@@ -116,7 +116,7 @@ flowchart LR
   KIRA -->|"submodule assh/ (pin)"| ASSH
   SAFE -->|"submodule assh/ (pin), the assh command"| ASSH
   KIRA --- CORE
-  VAULT -->|"replace ../tpm2-kira (no pin)"| CORE
+  VAULT -->|"replace ../tpm2-kira/core (no pin)"| CORE
   MARIFY -->|"core.properties (pin), gomobile"| CORE
   ASSH & KIRA & VAULT --> GOTPM
   VER -->|"go-tpm v0.9.8"| GOTPM
@@ -126,8 +126,9 @@ flowchart LR
 |---|---|---|---|
 | tpm2-kira | aSSH as a library (`hostkey`, `server`, `persist`, `sandbox`) | submodule `assh/`, `replace` in go.mod | `./pin assh` |
 | safearch | aSSH as a command (`ca`, `agent`, `tpm sha1`, `efivar`) in the image and the initrd | submodule `assh/` | `./pin assh` |
-| Marify | tpm2-kira's `mobile/kiracore` (and `kiratest`), with `attest/` and `transport/frame` | `core.properties` (a commit) | `./pin tpm2-kira` |
-| tpm2-kira-vault | tpm2-kira's `attest/` and `vaultproto/` | `replace ../tpm2-kira`: always the checkout | - |
+| tpm2-kira | its core (`github.com/mrwiora/tpm2-kira/core`) | `replace ./core`: the same repository | - |
+| Marify | the core's `mobile/kiracore` (and `kiratest`), with `attest/` and `transport/frame` | `core.properties` (a commit of tpm2-kira) | `./pin tpm2-kira` |
+| tpm2-kira-vault | the core's `attest/` and `vaultproto/` | `replace ../tpm2-kira/core`: always the checkout | - |
 | tpm2-kira, aSSH | go-tpm | a pseudo-version in go.mod (aSSH's `replace` to the fork reaches `tpmadmin` alone) | by hand, deliberately |
 
 Rules of the direction:
@@ -136,11 +137,13 @@ Rules of the direction:
   projects both need about the TPM, SSH, EFI variables or confinement goes
   there, generic, with its tests; never a tpm2-kira or safearch notion.
 - **What the phone and the vault speak with tpm2-kira lives in tpm2-kira's
-  shared core** (`attest/`, `transport/`, `vaultproto/`, `mobile/`): no
-  import of tpm2-kira's `internal/`, `main` or aSSH from there - the phone
-  binds it with gomobile, the vault builds it, and both get nothing else.
-  A change there is a change to the protocol of all three: their tests
-  run (below).
+  core**, `tpm2-kira/core/` - a Go module of its own
+  (`github.com/mrwiora/tpm2-kira/core`: `attest/`, `transport/`,
+  `vaultproto/`, `mobile/`), which requires go-tpm and x/crypto alone. The
+  module boundary keeps tpm2-kira's `internal/` and aSSH out of it; the
+  phone binds it with gomobile, the vault requires it, and both get nothing
+  else. A change there is a change to the protocol of all three: their
+  tests run (below).
 - **A new dependency between projects** gets a row in the tables above,
   a pin that `./pin status` shows (extend `pin`), and release builds that
   build the pin (`GOWORK=off`), not the checkout.
@@ -155,8 +158,8 @@ Rules of the direction:
   safearch. Go refuses to build inside a submodule here (it is not in
   `go.work`), which is the reminder.
 - **Development builds use the checkouts, releases the pins.** `go.work`
-  makes `go build` and `go test` in assh, tpm2-kira and the vault use each
-  other's checkouts, so a change reaches the others before it is committed.
+  makes `go build` and `go test` in assh, tpm2-kira, its core and the vault
+  use each other's checkouts, so a change reaches the others before it is committed.
   Every release build sets `GOWORK=off` and builds the pinned commits:
   tpm2-kira's PKGBUILD and debian/rules, safearch's `lib/assh.sh` and its
   tests, Marify's `build-core.sh` (from a fresh archive). A new release
@@ -164,8 +167,8 @@ Rules of the direction:
 - **`./pin status` before a release, and after a change to a project
   others use.** It shows every pin against the checkout it pins: the aSSH
   submodules, Marify's `core.properties` (the tpm2-kira commit the app
-  links; `./pin tpm2-kira`), the vault's `replace ../tpm2-kira` (always the
-  checkout), and go-tpm, which tpm2-kira and aSSH pin by intent and `pin`
+  links; `./pin tpm2-kira`), the vault's `replace ../tpm2-kira/core` (always
+  the checkout), and go-tpm, which tpm2-kira and aSSH pin by intent and `pin`
   shows without moving.
 - **Pinning is staging.** `pin` never commits; the commit of a new pin is
   the consuming project's, with its tests run against it.
@@ -176,7 +179,7 @@ Rules of the direction:
 |---|---|
 | `assh/` | its tests (`go test ./...`, swtpm); tpm2-kira's suite against it (`go.work`); safearch's `tests/run.sh` after `./pin assh` |
 | tpm2-kira's `internal/`, the boot integration | `make test-all` (unit and integration, swtpm); `tools/vmtest.py --target both` on fresh VMs |
-| tpm2-kira's shared core | the above, the vault's tests, Marify's `android/scripts/test-emulator.sh` (JVM, emulator and swtpm tests) after `./pin tpm2-kira` |
+| `tpm2-kira/core/` | the above (`make test-unit` runs the core's tests in `core/`), the vault's tests, Marify's `android/scripts/test-emulator.sh` (JVM, emulator and swtpm tests) after `./pin tpm2-kira` |
 | `tpm2-kira-vault/` | its tests; `tools/vmtest.py` (the vault steps) |
 | `safearch/` | `tests/run.sh` (and `tests/vm.sh` for a boot) |
 
