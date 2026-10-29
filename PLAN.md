@@ -62,6 +62,25 @@ follow, and remove the duplicates, before more is built on top.
       tpm2-verifier's command), its data signed. A TPM of a vendor not in
       the store is not untrusted: the result says "vendor not known" - a
       risk to weigh, not a refusal - until its vendor is added.
+      Design (to confirm):
+      - **Where:** a package in tpm2-verifier, `ekroots`, that embeds its
+        vendor directory (`go:embed`) with the `MANIFEST` and
+        `MANIFEST.sig` it already has, and checks them at load against the
+        signing key compiled in (`manifest`, SSH signature, namespace
+        `tpm2-verifier-vendors`): a file that is not in the signed
+        manifest, or differs, is never used.
+      - **API:** `ekroots.Check(chain) Result` - `Verified` (vendor and
+        chain), `VendorUnknown` (no root of that vendor: information, a
+        risk, the boot is not refused for it), `Failed` (a known vendor's
+        chain that does not verify: refused). The same result in the
+        phone, tpm2-kira's `phone ekcert`, the vault and tpm2-verifier's
+        command.
+      - **Users:** tpm2-kira's core (`attest/ekcert.go`, the phone through
+        it) instead of `core/attest/ekroots/`, which goes; tpm2-verifier's
+        command keeps reading a newer signed directory next to the binary,
+        through the same package.
+      - **Pinned like the others:** the core requires tpm2-verifier
+        (open question 6).
 - [ ] 4. **One go-tpm**: tpm2-verifier on the same go-tpm as the others
       (`36f2059`), and `./pin status` warns when two projects' go-tpm differ.
 - [ ] 5. **`pin` reads its pins from a manifest** (`pins.conf`: consumer,
@@ -85,5 +104,12 @@ follow, and remove the duplicates, before more is built on top.
    release?
 4. Step 6: remove `mkinitcpio-systemd-extras/` from the workspace, or keep
    it as an unrelated checkout?
+6. Step 3: the core module would require tpm2-verifier. Today every pin
+   between projects is a git submodule, because nothing is pushed; a
+   submodule `tpm2-verifier/` inside `tpm2-kira/core/` works offline but
+   makes Marify's core build fetch it too (the archive of a commit has no
+   submodules). Pushing tpm2-verifier and tpm2-kira and pinning by Go
+   pseudo-versions (`go.mod`, `go.sum`) is the plain Go way and needs no
+   submodule anywhere - for the core, aSSH and the vault alike. Which?
 5. Step 7 (findings 7): which remotes, and when to push - the submodule
    pins only resolve for others once `assh/` is pushed.
