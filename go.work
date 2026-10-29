@@ -7,6 +7,11 @@ go 1.26.0
 use (
 	./assh
 	./tpm2-kira
-	./tpm2-kira/core
 	./tpm2-kira-vault
+	./tpm2-kira/core
 )
+
+// tpm2-kira and the vault each replace the core with their own copy
+// (./core, the vault's submodule ./tpm2-kira/core): here both take the
+// checkout.
+replace github.com/mrwiora/tpm2-kira/core v0.0.0 => ./tpm2-kira/core

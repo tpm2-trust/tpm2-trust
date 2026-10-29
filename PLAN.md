@@ -34,7 +34,7 @@ follow, and remove the duplicates, before more is built on top.
 
 ## Steps (proposed - nothing is done before confirmation)
 
-- [ ] 1. **The shared core as a module of its own** (decided: inside tpm2-kira), in tpm2-kira's
+- [x] 1. **The shared core as a module of its own** (decided: inside tpm2-kira), in tpm2-kira's
       repository: `core/` with its own go.mod
       (`github.com/mrwiora/tpm2-kira/core`), holding `attest/`,
       `transport/`, `vaultproto/`, `mobile/`. tpm2-kira requires it
@@ -45,9 +45,14 @@ follow, and remove the duplicates, before more is built on top.
       Done: tpm2-kira 86340f0, the vault 6c8c112, Marify 95ea722, the
       workspace e9d75fd; tpm2-kira's and the core's suites pass, the vault's
       too; Marify's Android run against it - see below.
-- [ ] 2. **The vault pins the core**: a commit in the vault's go.mod (a
-      pseudo-version of the core module, as tpm2-kira pins go-tpm), moved by
-      `./pin core`; `go.work` gives the checkout for development.
+- [x] 2. **The vault pins the core**: as aSSH is pinned - a git submodule
+      `tpm2-kira/` in the vault, its go.mod replacing the core with
+      `./tpm2-kira/core`, moved by `./pin tpm2-kira` (with Marify's pin);
+      `go.work` gives the checkout for development. (A pseudo-version
+      would have Go fetch tpm2-kira from its remote, and nothing is pushed:
+      open question 5.)
+      Done: the vault 215d1b8, go.work replaces the core at
+      v0.0.0 with the checkout; the vault's tests pass from the pin.
 - [ ] 3. **One EK root store and verifier**: tpm2-verifier's `verify`
       package and vendor data become what the phone core and tpm2-kira
       check EK chains with; the phone app keeps embedding the data at build

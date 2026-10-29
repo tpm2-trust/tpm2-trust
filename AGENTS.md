@@ -116,7 +116,7 @@ flowchart LR
   KIRA -->|"submodule assh/ (pin)"| ASSH
   SAFE -->|"submodule assh/ (pin), the assh command"| ASSH
   KIRA --- CORE
-  VAULT -->|"replace ../tpm2-kira/core (no pin)"| CORE
+  VAULT -->|"submodule tpm2-kira/ (pin), its core"| CORE
   MARIFY -->|"core.properties (pin), gomobile"| CORE
   ASSH & KIRA & VAULT --> GOTPM
   VER -->|"go-tpm v0.9.8"| GOTPM
@@ -128,7 +128,7 @@ flowchart LR
 | safearch | aSSH as a command (`ca`, `agent`, `tpm sha1`, `efivar`) in the image and the initrd | submodule `assh/` | `./pin assh` |
 | tpm2-kira | its core (`github.com/mrwiora/tpm2-kira/core`) | `replace ./core`: the same repository | - |
 | Marify | the core's `mobile/kiracore` (and `kiratest`), with `attest/` and `transport/frame` | `core.properties` (a commit of tpm2-kira) | `./pin tpm2-kira` |
-| tpm2-kira-vault | the core's `attest/` and `vaultproto/` | `replace ../tpm2-kira/core`: always the checkout | - |
+| tpm2-kira-vault | the core's `attest/` and `vaultproto/` | submodule `tpm2-kira/`, `replace ./tpm2-kira/core` in go.mod | `./pin tpm2-kira` |
 | tpm2-kira, aSSH | go-tpm | a pseudo-version in go.mod (aSSH's `replace` to the fork reaches `tpmadmin` alone) | by hand, deliberately |
 
 Rules of the direction:
@@ -152,7 +152,8 @@ Rules of the direction:
 
 - **Edit a project in its checkout here, never in a copy of it inside
   another.** `tpm2-kira/assh` and `safearch/assh` are submodules: pins of a
-  commit of `assh/`, from which releases are built. A change to aSSH is
+  commit of `assh/`, from which releases are built; so is
+  `tpm2-kira-vault/tpm2-kira`, a pin of tpm2-kira for its core. A change to aSSH is
   made and committed in `assh/`; `./pin assh` then moves both submodules to
   it and stages the new pointers, which are committed in tpm2-kira and
   safearch. Go refuses to build inside a submodule here (it is not in
@@ -162,13 +163,16 @@ Rules of the direction:
   use each other's checkouts, so a change reaches the others before it is committed.
   Every release build sets `GOWORK=off` and builds the pinned commits:
   tpm2-kira's PKGBUILD and debian/rules, safearch's `lib/assh.sh` and its
-  tests, Marify's `build-core.sh` (from a fresh archive). A new release
+  tests, the vault's `make build`, Marify's `build-core.sh` (from a fresh
+  archive). Where two projects replace the same module with their own
+  copies (the core: tpm2-kira's `./core`, the vault's submodule),
+  `go.work` replaces it at the required version with the checkout. A new release
   build does the same.
 - **`./pin status` before a release, and after a change to a project
   others use.** It shows every pin against the checkout it pins: the aSSH
   submodules, Marify's `core.properties` (the tpm2-kira commit the app
-  links; `./pin tpm2-kira`), the vault's `replace ../tpm2-kira/core` (always
-  the checkout), and go-tpm, which tpm2-kira and aSSH pin by intent and `pin`
+  links) and the vault's submodule `tpm2-kira/` (both moved by `./pin
+  tpm2-kira`), and go-tpm, which tpm2-kira and aSSH pin by intent and `pin`
   shows without moving.
 - **Pinning is staging.** `pin` never commits; the commit of a new pin is
   the consuming project's, with its tests run against it.
