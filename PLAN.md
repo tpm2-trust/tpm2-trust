@@ -53,7 +53,7 @@ follow, and remove the duplicates, before more is built on top.
       open question 5.)
       Done: the vault 215d1b8, go.work replaces the core at
       v0.0.0 with the checkout; the vault's tests pass from the pin.
-- [ ] 3. **One EK root store and verifier**: tpm2-verifier's `verify`
+- [x] 3. **One EK root store and verifier**: tpm2-verifier's `verify`
       package and vendor data become what the phone core and tpm2-kira
       check EK chains with; the phone app keeps embedding the data at build
       time (nothing added at runtime). Decided: tpm2-verifier is the EK
@@ -81,6 +81,12 @@ follow, and remove the duplicates, before more is built on top.
         through the same package.
       - **Pinned like the others:** the core requires tpm2-verifier
         (open question 6).
+      Done: tpm2-verifier 68fe206..804ab7e (`ekroots`, the data in
+      `ekroots/vendors/`), tpm2-kira 69bcd7a, 31b83d0 (the core on
+      `ekroots`, `ek_vendor_unknown`), the vault 3d0795c, Marify 3f7a63b
+      (the bind screen), the workspace a935f5e. The signature: the
+      mechanism checks `MANIFEST.sig` against `manifest/allowed_signers`,
+      which names no key yet - open question 7.
 - [ ] 4. **One go-tpm**: tpm2-verifier on the same go-tpm as the others
       (`36f2059`), and `./pin status` warns when two projects' go-tpm differ.
 - [ ] 5. **`pin` reads its pins from a manifest** (`pins.conf`: consumer,
@@ -111,5 +117,10 @@ follow, and remove the duplicates, before more is built on top.
    submodules). Pushing tpm2-verifier and tpm2-kira and pinning by Go
    pseudo-versions (`go.mod`, `go.sum`) is the plain Go way and needs no
    submodule anywhere - for the core, aSSH and the vault alike. Which?
+7. Step 3: `manifest/allowed_signers` names no key and `MANIFEST.sig` does
+   not exist, so the EK root data is checked against its manifest's hashes,
+   not yet a signature. Whose ed25519 key signs it (`ssh-keygen -Y sign -n
+   tpm2-verifier-vendors`)? Once its public key is in `allowed_signers`,
+   `ekroots` uses signed data alone.
 5. Step 7 (findings 7): which remotes, and when to push - the submodule
    pins only resolve for others once `assh/` is pushed.

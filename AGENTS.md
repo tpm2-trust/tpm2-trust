@@ -97,7 +97,7 @@ AGENTS.md applies inside it and goes into detail; this file is the map.
 | `tpm2-kira-vault/` | the vault: releases a key part to a TPM quote of an approved boot, over TLS | Go, `github.com/mrwiora/tpm2-kira-vault` | binary, container |
 | `marify/` | Marify, the phone app: attests a boot over Bluetooth LE, keeps the phone salt | Kotlin (Android), Swift (iOS), the Go core bound with gomobile | APKs (`build-packages.sh apk`) |
 | `safearch/` | a read-only, signed Arch image (mkosi) whose identity is aSSH's | shell, mkosi | images, releases (`build.sh`, `release.sh`) |
-| `tpm2-verifier/` | EK certificate chains of TPM vendors, a curated root store | Go, `github.com/tpm2-trust/tpm2-verifier` | binaries, packages |
+| `tpm2-verifier/` | EK certificate chains of TPM vendors; the curated EK root store every project uses (`ekroots`: the vendor data embedded, checked against its signed manifest) | Go, `github.com/tpm2-trust/tpm2-verifier` | binaries, packages; a library |
 | `go-tpm/` | the go-tpm fork (`NVChangeAuth`), for aSSH's `tpmadmin` | Go | - |
 | `mkinitcpio-systemd-extras/` | sd-network and sd-tinyssh hooks; no project here uses them any more (tpm2-kira's SSH server replaced them, tpm2-kira HISTORY.md) | shell | - |
 
@@ -111,13 +111,14 @@ flowchart LR
   VAULT["tpm2-kira-vault"]
   MARIFY["marify"]
   SAFE["safearch"]
-  VER["tpm2-verifier"]
+  VER["tpm2-verifier<br/>ekroots: the EK root store"]
   GOTPM["go-tpm<br/>upstream 36f2059; fork for tpmadmin"]
   KIRA -->|"submodule assh/ (pin)"| ASSH
   SAFE -->|"submodule assh/ (pin), the assh command"| ASSH
   KIRA --- CORE
   VAULT -->|"submodule tpm2-kira/ (pin), its core"| CORE
   MARIFY -->|"core.properties (pin), gomobile"| CORE
+  CORE -->|"submodule tpm2-kira/tpm2-verifier (pin)"| VER
   ASSH & KIRA & VAULT --> GOTPM
   VER -->|"go-tpm v0.9.8"| GOTPM
 ```
@@ -129,6 +130,7 @@ flowchart LR
 | tpm2-kira | its core (`github.com/mrwiora/tpm2-kira/core`) | `replace ./core`: the same repository | - |
 | Marify | the core's `mobile/kiracore` (and `kiratest`), with `attest/` and `transport/frame` | `core.properties` (a commit of tpm2-kira) | `./pin tpm2-kira` |
 | tpm2-kira-vault | the core's `attest/` and `vaultproto/` | submodule `tpm2-kira/`, `replace ./tpm2-kira/core` in go.mod | `./pin tpm2-kira` |
+| tpm2-kira's core (and so the phone and the vault) | tpm2-verifier's `ekroots` | submodule `tpm2-kira/tpm2-verifier`, `replace ../tpm2-verifier` in `core/go.mod` (and `./tpm2-verifier` in tpm2-kira's, `./tpm2-kira/tpm2-verifier` in the vault's) | `./pin tpm2-verifier` |
 | tpm2-kira, aSSH | go-tpm | a pseudo-version in go.mod (aSSH's `replace` to the fork reaches `tpmadmin` alone) | by hand, deliberately |
 
 Rules of the direction:
@@ -139,11 +141,17 @@ Rules of the direction:
 - **What the phone and the vault speak with tpm2-kira lives in tpm2-kira's
   core**, `tpm2-kira/core/` - a Go module of its own
   (`github.com/mrwiora/tpm2-kira/core`: `attest/`, `transport/`,
-  `vaultproto/`, `mobile/`), which requires go-tpm and x/crypto alone. The
+  `vaultproto/`, `mobile/`), which requires go-tpm, x/crypto and
+  tpm2-verifier (its `ekroots`) alone. The
   module boundary keeps tpm2-kira's `internal/` and aSSH out of it; the
   phone binds it with gomobile, the vault requires it, and both get nothing
   else. A change there is a change to the protocol of all three: their
   tests run (below).
+- **The TPM vendors' EK roots are tpm2-verifier's `ekroots`**, for every
+  project: vendors are added there (two independent sources, the signed
+  manifest), never as a copy elsewhere. A TPM of a vendor not in the store
+  is "vendor not known" - a risk to weigh, not untrusted - everywhere it is
+  shown.
 - **A new dependency between projects** gets a row in the tables above,
   a pin that `./pin status` shows (extend `pin`), and release builds that
   build the pin (`GOWORK=off`), not the checkout.
