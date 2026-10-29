@@ -52,7 +52,11 @@ follow, and remove the duplicates, before more is built on top.
       package and vendor data become what the phone core and tpm2-kira
       check EK chains with; the phone app keeps embedding the data at build
       time (nothing added at runtime). Decided: tpm2-verifier is the EK
-      root store - the vendor roots are curated there from now on.
+      root store - the vendor roots are curated there from now on - as a
+      package every project uses (the phone core, tpm2-kira, the vault,
+      tpm2-verifier's command), its data signed. A TPM of a vendor not in
+      the store is not untrusted: the result says "vendor not known" - a
+      risk to weigh, not a refusal - until its vendor is added.
 - [ ] 4. **One go-tpm**: tpm2-verifier on the same go-tpm as the others
       (`36f2059`), and `./pin status` warns when two projects' go-tpm differ.
 - [ ] 5. **`pin` reads its pins from a manifest** (`pins.conf`: consumer,
@@ -70,7 +74,7 @@ follow, and remove the duplicates, before more is built on top.
    roots at runtime - so the phone core embeds tpm2-verifier's vendor data
    at build time (`go:embed` through a package of tpm2-verifier's), and
    tpm2-kira's `core/attest/ekroots/` goes. tpm2-verifier then becomes a
-   dependency of the core (go-tpm and yaml): acceptable for the phone?
+   dependency of the core (go-tpm and yaml): decided, acceptable.
 3. Step 4: may tpm2-verifier move to go-tpm `36f2059` (an unreleased
    upstream commit), or should everything wait for the next go-tpm
    release?
