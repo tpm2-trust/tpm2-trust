@@ -188,6 +188,14 @@ When a key type is ours to choose:
   - A key the TPM has to verify can be no longer than the TPM takes.
 - **ECDSA only where RSA is not possible.**
 
+### Old machines
+
+No project keeps an existing installation working across a change: a
+machine is set up again (a CA made again, a phone enrolled again, an image
+rebuilt), never migrated - in every project, not only where its own
+AGENTS.md says so. What still has to be said, every time and before the
+change: which former functionality breaks, and what the owner has to redo.
+
 ### Working across projects
 
 - **Edit a project in its checkout here, never in a copy of it inside
