@@ -14,10 +14,11 @@
 #                       tpm2-kira/ (its core) to tpm2-kira's HEAD
 #   ./pin tpm2-verifier tpm2-kira/tpm2-verifier (the core's EK root store)
 #                       to tpm2-verifier's HEAD
+#   ./pin go-uefi-slim  assh/go-uefi-slim and tpm2-kira/go-uefi-slim (EFI
+#                       variables, Secure Boot) to go-uefi-slim's HEAD
 #
-# go-tpm is required in every Go module's go.mod (aSSH's replace to the fork
-# reaches its tpmadmin alone): shown, compared - one version for all - and
-# moved by hand.
+# go-tpm is required in every Go module's go.mod: shown, compared - one
+# version for all - and moved by hand.
 
 set -euo pipefail
 
@@ -29,6 +30,8 @@ SUBMODULES=(
     "safearch assh assh"
     "tpm2-kira-vault tpm2-kira tpm2-kira"
     "tpm2-kira tpm2-verifier tpm2-verifier"
+    "assh go-uefi-slim go-uefi-slim"
+    "tpm2-kira go-uefi-slim go-uefi-slim"
 )
 
 red() { printf '\033[31m%s\033[0m' "$*"; }
@@ -62,7 +65,7 @@ where() {
 GOTPM_MODULES=(assh tpm2-kira tpm2-kira/core tpm2-kira-vault tpm2-verifier)
 
 # gotpm_status shows the go-tpm every module requires and warns when they
-# differ; aSSH's replace (the fork, for tpmadmin alone) is shown apart.
+# differ.
 gotpm_status() {
     local m v first="" differ=false
     for m in "${GOTPM_MODULES[@]}"; do
@@ -72,7 +75,6 @@ gotpm_status() {
         [[ $v == "$first" ]] || differ=true
         printf '%-26s %s\n' "go-tpm ($m)" "$v"
     done
-    printf '%-26s %s\n' "go-tpm (assh's replace)" "$(sed -n 's/^replace github.com\/google\/go-tpm => //p' "$ROOT/assh/go.mod") (tpmadmin alone)"
     if $differ; then
         echo "$(red "go-tpm differs between the modules: one version for all (go get github.com/google/go-tpm@<version> in each)")"
     else
@@ -101,7 +103,7 @@ status() {
     printf '%-26s %s  %s\n' "marify core.properties" "${kira:0:7}" "$(where "$ROOT/tpm2-kira" "$kira")"
     gotpm_status
     local repo
-    for repo in assh tpm2-kira; do
+    for repo in assh tpm2-kira go-uefi-slim; do
         dirty "$ROOT/$repo" && echo "$(red "$repo/ has uncommitted changes: a pin takes its HEAD, not them")"
     done
     return 0
@@ -157,6 +159,7 @@ case "${1:-status}" in
 status) status ;;
 assh) pin_submodules assh ;;
 tpm2-verifier) pin_submodules tpm2-verifier ;;
+go-uefi-slim) pin_submodules go-uefi-slim ;;
 tpm2-kira) pin_kira ;;
-*) die "usage: pin [status | assh | tpm2-kira | tpm2-verifier]" ;;
+*) die "usage: pin [status | assh | tpm2-kira | tpm2-verifier | go-uefi-slim]" ;;
 esac

@@ -98,11 +98,11 @@ AGENTS.md applies inside it and goes into detail; this file is the map.
 | `marify/` | Marify, the phone app: attests a boot over Bluetooth LE, keeps the phone salt | Kotlin (Android), Swift (iOS), the Go core bound with gomobile | APKs (`build-packages.sh apk`) |
 | `safearch/` | a read-only, signed Arch image (mkosi) whose identity is aSSH's | shell, mkosi | images, releases (`build.sh`, `release.sh`) |
 | `tpm2-verifier/` | EK certificate chains of TPM vendors; the curated EK root store every project uses (`ekroots`: the vendor data embedded, checked against its signed manifest) | Go, `github.com/tpm2-trust/tpm2-verifier` | binaries, packages; a library |
-| `go-tpm/` | the go-tpm fork (`NVChangeAuth`, branch `feat/NVChangeAuth`: google/go-tpm#452), for aSSH's `tpmadmin`; dropped once upstream has it | Go | - |
+| `go-uefi-slim/` | UEFI for Go on Linux: EFI variables (`efivar`), and Secure Boot's signature databases, signed updates and Authenticode, in what sbctl writes and reads; the standard library and x/sys alone | Go, `github.com/tpm2-trust/go-uefi-slim` | a library |
 
 Where they are published: github.com/tpm2-trust/<directory> - this
-workspace as `tpm2-trust/tpm2-trust` - except tpm2-kira and the go-tpm
-fork, which are github.com/mrwiora/<directory>. A pin only resolves for
+workspace as `tpm2-trust/tpm2-trust` - except tpm2-kira, which is
+github.com/mrwiora/tpm2-kira. A pin only resolves for
 others once the commit it names is on a published branch.
 
 ### How they depend on each other
@@ -116,7 +116,8 @@ flowchart LR
   MARIFY["marify"]
   SAFE["safearch"]
   VER["tpm2-verifier<br/>ekroots: the EK root store"]
-  GOTPM["go-tpm<br/>upstream 36f2059 everywhere; fork for tpmadmin"]
+  GOTPM["go-tpm<br/>upstream c395998 everywhere"]
+  UEFI["go-uefi-slim<br/>EFI variables, Secure Boot"]
   KIRA -->|"submodule assh/ (pin)"| ASSH
   SAFE -->|"submodule assh/ (pin), the assh command"| ASSH
   KIRA --- CORE
@@ -124,6 +125,8 @@ flowchart LR
   MARIFY -->|"core.properties (pin), gomobile"| CORE
   CORE -->|"submodule tpm2-kira/tpm2-verifier (pin)"| VER
   ASSH & KIRA & VAULT --> GOTPM
+  ASSH -->|"submodule go-uefi-slim/ (pin), persist"| UEFI
+  KIRA -->|"submodule go-uefi-slim/ (pin), its variables, Secure Boot"| UEFI
   VER --> GOTPM
 ```
 
@@ -134,8 +137,10 @@ flowchart LR
 | tpm2-kira | its core (`github.com/mrwiora/tpm2-kira/core`) | `replace ./core`: the same repository | - |
 | Marify | the core's `mobile/kiracore` (and `kiratest`), with `attest/` and `transport/frame` | `core.properties` (a commit of tpm2-kira) | `./pin tpm2-kira` |
 | tpm2-kira-vault | the core's `attest/` and `vaultproto/` | submodule `tpm2-kira/`, `replace ./tpm2-kira/core` in go.mod | `./pin tpm2-kira` |
+| aSSH | go-uefi-slim's `efivar` (`persist`: its CA in an EFI variable) | submodule `assh/go-uefi-slim`, `replace ./go-uefi-slim` in go.mod (safearch's build of the command takes it nested: `assh/go-uefi-slim`) | `./pin go-uefi-slim` |
+| tpm2-kira | go-uefi-slim (its own EFI variables, Secure Boot) | submodule `tpm2-kira/go-uefi-slim`, `replace ./go-uefi-slim` in go.mod (aSSH's replace does not reach it) | `./pin go-uefi-slim` |
 | tpm2-kira's core (and so the phone and the vault) | tpm2-verifier's `ekroots` | submodule `tpm2-kira/tpm2-verifier`, `replace ../tpm2-verifier` in `core/go.mod` (and `./tpm2-verifier` in tpm2-kira's, `./tpm2-kira/tpm2-verifier` in the vault's) | `./pin tpm2-verifier` |
-| every Go module (aSSH, tpm2-kira, its core, the vault, tpm2-verifier) | go-tpm | one pseudo-version in each go.mod, the same everywhere: they end up in one binary (aSSH's `replace` to the fork reaches `tpmadmin` alone); `./pin status` warns when they differ | by hand, in every module at once |
+| every Go module (aSSH, tpm2-kira, its core, the vault, tpm2-verifier) | go-tpm | one pseudo-version in each go.mod, the same everywhere: they end up in one binary; no `replace` of it anywhere; `./pin status` warns when they differ | by hand, in every module at once |
 
 Rules of the direction:
 
@@ -156,9 +161,32 @@ Rules of the direction:
   manifest), never as a copy elsewhere. A TPM of a vendor not in the store
   is "vendor not known" - a risk to weigh, not untrusted - everywhere it is
   shown.
+- **EFI variables go through the workspace's `go-uefi-slim` module**, which neither aSSH nor
+  tpm2-kira owns (the standard library and x/sys alone).
+  - aSSH's `persist` uses it for aSSH's variables (its CA file, `efi:NAME`).
+  - tpm2-kira uses it directly, not through aSSH, for its own variables (the
+    machine-id, the slots' records) and for Secure Boot's (PK, KEK, db, dbx).
+  - safearch's scripts use the `assh efivar` command.
+  - What both need about UEFI goes into `go-uefi-slim`, generic, with its tests; never a copy in
+    a project, never aSSH's.
+  - NV indices stay with aSSH's `persist`.
 - **A new dependency between projects** gets a row in the tables above,
   a pin that `./pin status` shows (extend `pin`), and release builds that
   build the pin (`GOWORK=off`), not the checkout.
+
+### Key algorithms
+
+When a key type is ours to choose:
+
+- **Ed25519 wherever every party that uses the key supports it** (SSH user keys, for
+  example).
+- **Otherwise RSA, at the greatest length every one of those parties accepts, rather
+  than ECDSA.**
+  - A TPM, UEFI Secure Boot and a PIV token often have no Ed25519.
+  - "Accepts" is decided from the device where it can be asked (a TPM: `TPM2_TestParms`).
+    swtpm 0.10 takes RSA up to 3072; many hardware TPMs only take 2048.
+  - A key the TPM has to verify can be no longer than the TPM takes.
+- **ECDSA only where RSA is not possible.**
 
 ### Working across projects
 
@@ -197,6 +225,7 @@ Rules of the direction:
 | tpm2-kira's `internal/`, the boot integration | `make test-all` (unit and integration, swtpm); `tools/vmtest.py --target both` on fresh VMs |
 | `tpm2-kira/core/` | the above (`make test-unit` runs the core's tests in `core/`), the vault's tests, Marify's `android/scripts/test-emulator.sh` (JVM, emulator and swtpm tests) after `./pin tpm2-kira` |
 | `tpm2-kira-vault/` | its tests; `tools/vmtest.py` (the vault steps) |
+| `go-uefi-slim/` | its tests (the immutable test as root on a VM); aSSH's and tpm2-kira's suites after `./pin go-uefi-slim`; the VM test |
 | `safearch/` | `tests/run.sh` (and `tests/vm.sh` for a boot) |
 
 The VM test and the emulator test run without anyone at the keyboard from
