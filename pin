@@ -122,7 +122,7 @@ nested() {
             rm -rf "${dir:?}/$sub"
             git clone -q --no-checkout "$ROOT/$sub" "$dir/$sub"
         fi
-        git -C "$dir/$sub" fetch -q "$ROOT/$sub" "+refs/heads/*:refs/remotes/workspace/*"
+        git -C "$dir/$sub" fetch -q --no-recurse-submodules "$ROOT/$sub" "+refs/heads/*:refs/remotes/workspace/*"
         git -C "$dir/$sub" checkout -q --detach "$sha"
     done < <(git -C "$dir" ls-tree HEAD)
 }
@@ -137,7 +137,7 @@ pin_submodules() {
         read -r consumer path checkout <<<"$line"
         [[ $checkout == "$co" ]] || continue
         dirty "$ROOT/$consumer/$path" && die "$consumer/$path has changes of its own: move them to $co/ first"
-        git -C "$ROOT/$consumer/$path" fetch -q "$ROOT/$checkout" "+refs/heads/*:refs/remotes/workspace/*"
+        git -C "$ROOT/$consumer/$path" fetch -q --no-recurse-submodules "$ROOT/$checkout" "+refs/heads/*:refs/remotes/workspace/*"
         git -C "$ROOT/$consumer/$path" checkout -q --detach "$sha"
         nested "$ROOT/$consumer/$path"
         git -C "$ROOT/$consumer" add "$path"
