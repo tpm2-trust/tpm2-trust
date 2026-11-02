@@ -1,3 +1,38 @@
+# PLAN: one proof run, no repeated work (the test clean-up)
+
+Status: **confirmed (2026-11-03), in progress; before M1-M3.** The owner: what can be done in one shot before a restart is done in one shot; 1.5 h per proof is too much.
+
+Measured at f0965aa: VM test about 15 min (Arch 878 s), hibernate test about 18 min, a boot 50-100 s; Marify and safearch's `tests/vm.sh` on top. The host stays idle (load below 1): waits and repetition, not CPU. The whole proof's 1.5 h is not yet measured as one number: N0 does.
+
+**Target:** one command, one setup per machine, VM and hibernate checks together in about 15 min, with **no check dropped**. Estimates, N0 replaces them.
+
+- [ ] N0. `tools/proof.py`: every part of a proof, a time per part, one total, one report (it replaces no tool yet).
+- [ ] N1. **Same-boot checks together.** One `after_boot()` per boot does every check of the running system over one ssh connection (`ControlMaster`), instead of a connection per check; what needs no restart never gets one of its own. Nothing is tested twice per boot.
+- [ ] N2. **One setup.** The hibernate steps run in the VM test's machine, after its boots, no reset, no second install, enrolment or `control` (about 5 min per machine). One process, one report. `hibernatetest.py` stays as a name for `--only` runs. A step failing doesn't end the others unless the machine is gone.
+- [ ] N3. **Boots with one purpose merged, where the path is the same:** `--cycles 2` to 1 (the second typed boot repeats the first; hibernate's reboots 1, 2, 3, 9 do too, kept only where a step needs a clean boot); the revoked device's boot already ends in the typed path, so it replaces a typed boot; each recipe keeps exactly one boot. A list before and after, per check, for the owner.
+- [ ] N4. **Order, so waits vanish.** V2's 180 s is `kvm-clock` catching up to the old guest's uptime: V2 straight after a short boot, not after the whole setup (measured: about 10 s from a saved setup against 178 s). Then the failure paths last.
+- [ ] N5. **The machine, no product change, PCRs checked unchanged as for `noreboot`:** `-smp 4` (Argon2id's 4 lanes on 2 vCPUs, the host has 12); disk `cache=unsafe` (a test disk is thrown away; install, image builds and hibernate images write a lot); the loaders' menu timeouts skipped from the console, not by changing `fresh`.
+- [ ] N6. **Failure paths (V4, V8, V9) only when the rule asks,** per M4; the close's 30 s TPM wait is real and stays in the proof. Each ladder rung once per distribution, no repeats.
+- [ ] N7. **Move down what needs no VM:** `control` line by line, a slot's life, removal, `--help`, reading commands to the swtpm integration suite where they prove the same; what's boot-only stays. Each move names the check it replaces.
+- [ ] N8. `make test-all`, Marify and `tests/vm.sh` start in parallel with the VM part where they share nothing (memory 15 GB: measured), each only when the batch touched it (AGENTS.md's table).
+
+Not changed: a proof runs without `--fast-kdf`, from `fresh`. Open: Argon2id at the real cost on one boot per recipe and `--fast-kdf` on the repeats would save a few minutes more, but makes the proof's package a mix: I don't recommend it.
+
+Order: N0, N5 and N4 (small, large gain), N1, N2, N3, N6, N7, N8. M4 merges into this. M1-M3 use it.
+
+---
+
+# PLAN: the admin commands locked; the vault refuses unless Secure Boot is on; the initrd's state from the event log
+
+Status: **confirmed (2026-11-03), starts after L's final proof.**
+
+- [ ] M1. `slot add`, `slot approve`, `setup` (and whatever else holds a TOTP key, a PEM signing key or a YubiKey PIN) take L1's lock, first thing. `assh agent` and `serve` stay as they are; the WARNING stays open.
+- [ ] M2. The vault releases nothing unless the quote establishes Secure Boot `on` (K3's state: the quoted PCR 7 and its events replayed). Off, Setup Mode and "not established", a slot without PCR 7 included, are refused, shown and audited; no per-device exception. Tests per state in the vault. **Decided (option A): the VM test's vault steps run with Secure Boot really on:** real keys enrolled in the machine's firmware, the UKI signed on Arch, shim with Microsoft's certificates on Debian, from a snapshot of its own next to `fresh`, made reproducibly by a script (never overwriting `fresh` or `export`). It also shows what is unproven so far: the firmware refusing a changed UKI, and a true `on` state. How the keys get enrolled (test tooling on `go-uefi-slim`, `sbctl`, or `exp/debian-uki`'s `internal/secureboot`): the agent's choice, stated in its report. Owners need a recovery keyslot: `control` says so before a vault-only recipe on a machine not `on`.
+- [ ] M3. The phone's initrd message from the event log checked against the quoted PCRs, not `BootContext.InitrdState`, which goes. "Not established" is red. If it can't be derived, the message goes, and the report says why. `core`, so the vault's tests and Marify's at the end of the batch.
+
+- [ ] M4. Test tools (first in the batch, so that the batch uses them; no product change): `hibernatetest.py --no-failure-paths` (without V4, V8, V9), V9 in `--only`; `vmtest.py --only SECTION` (setup, boots, vault, slot life) from a saved setup; `tools/test-affected.py`, which reads `git diff` against a base and prints what AGENTS.md's "What to test after a change" asks for, and starts nothing. None of these is a final proof, and a report says so. Tests of the helper's table against AGENTS.md's, so they can't drift apart. `docs/TESTING.md`.
+---
+
 # PLAN: nothing that holds the passphrase reaches swap or a core file
 
 Status: **confirmed (2026-11-02), done (2026-11-02).** Final proof at tpm2-kira `f0965aa` (after it: test tools and documentation), aSSH `8c18175`, safearch `f9c8745`, without `--fast-kdf`, from `fresh`: VM test Arch 211, Debian 206, 0 failed (`.local/runs/l/final/vmtest`); hibernate test Arch 163, Debian 152, 0 failed, the same "not tested" items as before: Arch V3, Debian V2 and V4-reverted (`.local/runs/l/final/hib`); `make test-all` 1061 passed, 8 skipped, 0 failed, no `(cached)` (`.local/runs/l/final/test-all.log`); aSSH 89 passed, 1 skipped (`final/assh.log`); safearch `tests/run.sh` 335 passed, 0 failed, 1 skipped; `tests/vm.sh` 48 checks, 0 failed (`final/safearch-vm.log`). A first hibernate run stopped on a relative `--run-dir`, a defect of the tool: the probe built elsewhere, `SystemExit` dropped in the thread (`final/hib-1-relative-dir`); fixed afterwards in `28e0039`, that fix not run itself. The VMs' base images were gone and restored during this work (2026-11-02); the checksums of `fresh`'s variables match.
