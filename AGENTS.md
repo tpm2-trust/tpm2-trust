@@ -232,9 +232,9 @@ Test by what changed, and no more; the full proof belongs to the end of a batch.
 | Changed | Run |
 |---|---|
 | Docs only | nothing |
-| Test tools | the affected step alone (`hibernatetest.py --only STEP`) |
+| Test tools | the affected scenario alone (`vmtest.py --only SCENARIO`) |
 | Installed-system code of tpm2-kira (`control`, `status`, the admin commands) | `make test-all` |
-| tpm2-kira's boot, close or unlock | `make test-all`; `tools/vmtest.py --fast-kdf`; the affected hibernate steps, from a saved setup |
+| tpm2-kira's boot, close or unlock | `make test-all`; `tools/vmtest.py --fast-kdf`; the affected scenarios, from a saved setup |
 | Argon2id, or what memory the boot takes | as above, at the real cost (without `--fast-kdf`), on the affected boots |
 | `tpm2-kira/core/` | as for the boot; the vault's tests. Marify's `android/scripts/test-emulator.sh` at the end of the batch, after `./pin tpm2-kira` |
 | `assh/` | its tests (`go test ./...`, swtpm); tpm2-kira's `make test-all` against it (`go.work`); safearch's `tests/run.sh` after `./pin assh` |
@@ -243,9 +243,17 @@ Test by what changed, and no more; the full proof belongs to the end of a batch.
 | `tpm2-verifier/` | its tests; `core`'s and the vault's after `./pin tpm2-verifier` |
 | `safearch/` | `tests/run.sh`; `tests/vm.sh` at the end of the batch, when the boot changed |
 
-**The final proof, once per batch, before the owner pushes:** `GOFLAGS=-count=1 make test-all` with nothing `(cached)`; `tools/vmtest.py --target both` and `tools/hibernatetest.py --target both --no-build`, from `fresh` and without `--fast-kdf`; and those of the rows above that the batch touched. A run with `--fast-kdf` or from a saved setup is never the proof; a report says which it was. The failure paths (hibernate's V4, V8, V9) run only when the close or the boot changed, and in the final proof.
+`tools/test-affected.py` (tpm2-kira; `--since TIME` for a batch) prints what this table asks for the changes against a base, and starts nothing; a test keeps its table and this one in step.
 
-**A run of yours:** iterate from a saved setup (`--save-setup`, `--only`; `docs/TESTING.md`). A wait for a run ends on the run's failure too, not only on the line it hopes for. Stage what you changed by name: a shared checkout may hold another agent's work.
+The depths of testing, what runs at each and what none of them covers: `tpm2-kira/docs/TESTING.md`, "Test depths".
+
+**The proof, once per batch, before the owner pushes:** `tools/proof.py --since <the batch's start>`, one command, from `fresh`, without `--fast-kdf`: both machines in parallel through the scenarios that have a budget, beside them `make test-all` with nothing `(cached)`, aSSH's tests, the vault's and safearch's `tests/run.sh`. **15 minutes wall clock is a hard limit:** a run over it stops, fails and names the scenario. Parts the table names on top run after it, outside the limit. A run with `--fast-kdf`, from a saved setup or with `--only` is never the proof; a report says which it was.
+
+**`tools/proof.py --all`, before a release, the owner's call:** every scenario the proof left out, by name, `tests/vm.sh` and Marify, with no limit.
+
+**No full run while a scenario fails.** Each is proven alone from a saved setup first (`vmtest.py --only SCENARIO`), then one proof; if it fails, that scenario alone again. **A run expected over 10 minutes is announced first.**
+
+**A run of yours:** iterate from a saved setup (`--save-setup`, `--only`; `tpm2-kira/docs/TESTING.md`). A wait for a run ends on the run's failure too, not only on the line it hopes for. Stage what you changed by name: a shared checkout may hold another agent's work.
 
 The VM test and the emulator test run without anyone at the keyboard from
 a defined state (tpm2-kira `docs/TESTING.md`, Marify `android/TESTING.md`);
