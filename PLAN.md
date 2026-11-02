@@ -1,10 +1,26 @@
+# PLAN: nothing that holds the passphrase reaches swap or a core file
+
+Status: **confirmed (2026-11-02), starts after K1-K3.** Today: the terminal's passphrase buffer is `mlock`ed (its error ignored), nothing else is: not the pipe path (a growing slice), Argon2id's 1 GiB, the derived key and salt or the Go heap; only the boot's unlock server is not dumpable. At boot the initrd has no swap. `luks enrol` and `phone salt enrol` on the running system are the gap.
+
+- [ ] L1. One helper, first thing in every installed-system command that handles a passphrase, a salt or a derived key: `mlockall(MCL_CURRENT | MCL_FUTURE)` and `PR_SET_DUMPABLE=0`, on all threads as aSSH's rule says (`sandbox`'s way). A lock that fails stops the command with an error **before** the passphrase is asked. Find every such command; a test lists them.
+- [ ] L2. At boot: best effort, said in the log; a failure never withholds a prompt (No enforced mode), and K1's measured memory floor holds with the lock on (a locked heap is what K1 frees).
+- [ ] L3. `ReadPassphrase`'s non-terminal path uses the same fixed locked buffer as the terminal's; `mlock`'s error is handled; what's read is wiped on every way out.
+- [ ] L4. aSSH: the same review for what holds the PIN. Report; change only with the same helper in `sandbox`, and what uses it.
+- [ ] L5. Tests: `VmLck` in `/proc/self/status` covers the process, not dumpable, a refused lock stops before the prompt (a low `RLIMIT_MEMLOCK` without `CAP_IPC_LOCK`). `docs/DISK-KEY.md` and `docs/SECURITY-BACKGROUND.md` say what is. VM test: an enrolment on Debian, which has swap, leaves swap untouched.
+
+What breaks: such a command on a machine too small to lock Argon2id's 1 GiB now fails instead of swapping.
+
+---
+
 # PLAN: Argon2id's memory; Arch's slow resume; Secure Boot off is red on the phone and the vault
 
-Status: **confirmed (2026-11-02), in progress.**
+Status: **confirmed (2026-11-02), done (2026-11-02).** Final proof at tpm2-kira `dcc9ede`, without `--fast-kdf`, from `fresh`: VM test Arch 202, Debian 196, 0 failed (`.local/runs/k/final/vmtest`); hibernate test Arch 160, Debian 149, 0 failed, the same "not tested" items as before: Arch V3, Debian V2 and V4-reverted (`.local/runs/k/final/hib`); `make test-all` 1054 passed, 8 skipped, 0 failed, no `(cached)` (`.local/runs/k/final/test-all.log`).
 
-- [ ] K1. `debug.FreeOSMemory` after `diskkey.Combine` (and wherever the boot's Argon2id output is done with). Measured: `tpm2-kira-boot`'s heap stays 2.1 GiB after two derivations, the keyslot's Argon2id on top: at 3072 MiB a boot after a wrong pepper hits the OOM killer, at 2048 MiB a plain typed boot on Arch. Then the boots at 3072 and 2048 MiB again, and the real minimum measured: into docs and `control`'s status (red below it). If 1 GiB of Argon2id plus the keyslot's own cannot be made to fit, say what the floor is.
-- [ ] K2. Arch's V2: about 205 s between the prompts and ssh, against about 30 s from `hib-setup`, and not Argon2id (`--fast-kdf` 212 s). Find the cause with evidence; a product cause is fixed, a test machine's reported; say which.
-- [ ] K3. Secure Boot off, or Setup Mode, or not readable: **red on the phone and at the vault.** Established from what the TPM vouches for (the quote's PCR 7 and the event log replayed against it), never from what the machine says. A protocol change in `core`, if needed: Marify's Kotlin and Swift screens, the vault's device view, audit and CLI. No change to what releases unless the owner decides it: the vault's approvals of PCR 7 already refuse a changed state: report whether that holds.
+- [x] K1. `debug.FreeOSMemory` in `diskkey.Combine`, one derivation at a time. Boot's log, before: heap 2052, resident 2071, peak 2071 MiB after a wrong pepper; after: at most 2, 22, 1047 MiB.
+  - Done: tpm2-kira `c70ce8d`, `bb80f89`, `81f91e4`. **Floor: 1620 MiB of MemTotal** (a 1792 MiB guest: all pass, `.local/runs/k/mem/vm-1792`), red in `control`. 3072 and 2048 hold; 1536 boots but Debian's enrolment swaps 3 pages; 1280 fails on both. `tools/LOCALVM.md`, `docs/DISK-KEY.md`. Argon2id's memory is not wiped by x/crypto, before or after: `docs/DISK-KEY.md`. Not shown: a 1 GiB keyslot at the floor (`cryptsetup` scaled them to 340-585 MiB), two volumes at once.
+- [x] K2. **The test machine's, not a product cause; reported, not repaired.** The resumed guest's `kvm-clock` counts from qemu's start and a resume is under a new qemu: the kernel holds its last value until the new one passes it. From `fresh`: 223 s of qemu before, 40 s at the resume, a wait of about 182 s, no disk I/O (`.local/runs/k/k2/sample-full.log`), both vCPUs in `pv_native_safe_halt` (`rip.log`). From a saved setup about 10 s; held up 300 s longer, past the test's 300 s (`run5`). tpm2-kira `dcc9ede`. The wait's margin to the test's limit is about 120 s from `fresh`.
+- [x] K3. **WARNING, fixed: the phone took Secure Boot's state from the machine's unsigned `BootContext.SecureBootState`.** Now `attest.EstablishSecureBoot`: the quoted PCR 7, PCR 7's event digests replayed against it, the verifier's own hashes of `UEFI_VARIABLE_DATA` before the separator. Red in every state but on: Marify's verdict and bind screens (Android; iOS written, not compiled), the vault's device view, request, audit, CLI. It decides nothing.
+  - Done: tpm2-kira `c66502b`, `81f91e4` (Debian's initrd had no securityfs, so no log); vault `dcf9bda`; Marify `f8d4e61`, JVM 59, instrumented 46, swtpm 8. Schema 3. The vault's approvals refuse a PCR 7 no approval covers, with PCR 7 in the slot's selection: "as approved", not "on"; a state the signing key approved with Secure Boot off releases, red. Unchanged: the owner's decision. Open: the initrd coverage note on the phone also rests on an unsigned word of the machine's (not fixed here).
 
 ---
 
