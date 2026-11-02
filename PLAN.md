@@ -1,3 +1,34 @@
+# PLAN: the slot's channel secrets sealed; shared code where it belongs
+
+Status: **confirmed (2026-11-01), done (2026-11-02).** Order below is the owner's: the highest priority first, then the helpers the libraries already have.
+
+## Goal
+
+- `NoisePrivate` and `AdvKey` leave the world-readable EFI variable `KIRAslotN` and are sealed in the TPM.
+- Docs and comments the reworked `docs/SECURITY-BACKGROUND.md` found stale are corrected.
+- Duplicated UEFI/UKI code goes into `go-uefi-slim`; hand-written policy digests use go-tpm's `PolicyCalculator`.
+
+## Steps
+
+- [x] G1. Stale text: `docs/BOOT-INTEGRATION.md` and `docs/SSH.md` (`close --resume`; `ssh-child`'s uid; "Not run on a VM yet: ... the SSH CA"), `SECURITY.md:90,143` (who can read a slot record), `internal/nvslot/blob.go`, `internal/admin/slot_remove.go` (the recovery stash), `tpm2-kira/AGENTS.md` (Secure Boot: what this branch does: it reads and judges; key creation, enrolment and db signing are only on `exp/debian-uki`).
+  - Done: tpm2-kira `da71964` (docs), `9af084b` (the two comments).
+- [x] G2. **Decided 2026-11-01, option A (replaces the design in this step): the object's policy is `PolicyOR(PolicyPCR(15 == 0), PolicySigned(signing key, nonce))`, each branch with `PolicyCommandCode(Unseal)`. Not under the slot's policy: an unapproved boot must still start the gate, so the phone shows "changed"; further-phone and salt enrolment on the running system use the signing key. Before the close, anything booted on the machine can read them (`SECURITY.md` accepts that); the wire does not change. Phones enrolled again (blob 19).** **Security: the channel secrets sealed in the TPM** (a local user reads `KIRAslotN`, mode 0644, efivarfs; a user can imitate the Bluetooth endpoint). `NoisePrivate` and `AdvKey` are sealed under the slot's policy (PCR 15 included), so they open at the gate and close with everything else; the blob carries only the sealed form. To establish before coding, and to report if it does not fit: what needs them after the close (enrolling a second phone on the running system, `control`, status): a key made at enrolment and only sealed needs no unseal; anything that must read it there needs a design decision by the owner. Whether the channel's static key should instead be a TPM key doing the agreement itself (the boot key already can) is worth weighing, against the phone's protocol staying unchanged. Blob version raised. Tests: the record holds no clear secret (a test over the bytes); after the close the secrets refuse; the phone flow (`core`'s tests, the emulator). Then the same check over every other field of the blob: nothing else secret in clear. Breaks: phones enrolled again.
+  - **Study (2026-11-01), the design as written does not fit:** (1) on the running system, after the close, `phone enrol` for a further phone (`attest.go:418,507`: XX with the same static key, the same AdvKey given out) and `phone salt enrol` / `luks enrol` (`factor_enrol.go:171`: a whole gate, IK) both need the clear secrets. (2) Under the slot's policy the gate cannot start in a boot nobody approved: the phone never sees its "changed" diff (§13.4), which SECURITY.md gives as the reason sealing to the PCRs was rejected. Recommended: `PolicyOR(PolicyPCR(15 == 0), PolicySigned(signing key))`, `PolicyCommandCode(Unseal)` in each branch; the wire is unchanged. Owner's decision.
+  - The other fields: nothing else secret in clear.
+  - Done: tpm2-kira `3c89bb7`; `TestChannelSecretsSealed`, `make test-all` 937 passed, 0 failed. A third use on the running system came up: `phone gate` opens them with the signing key after the close.
+- [x] G3. `go-uefi-slim`: a new generic `uki` package: PE sections, `.pcrsig` and systemd's PCR signature JSON (`ParsePCRSignatures`, today twice: `assh/hostkey/signed.go`, `tpm2-kira/internal/measure/pcrsig.go`; compare the two first, and report any difference: it may be a bug in one), PCR 11's section measurements (`ukipredict.go`), PCR 4's Authenticode input where generic. aSSH and tpm2-kira use it; their copies go. The module stays standard library and x/sys: what needs go-tpm stays with its user. Its tests, fuzz of the parsers; `./pin go-uefi-slim`.
+  - Done: `go-uefi-slim` `8f7d9c7` (`uki`: tests, 3 fuzz targets 40 s each, PCR 11 equal to `systemd-measure calculate`), aSSH `a4c80a1`, `78b1fac`, tpm2-kira `09b563c`, `f71b99e`. The two `ParsePCRSignatures`: same behaviour; tpm2-kira's struct had an unread `Pkfp`.
+- [x] G4. Policy digests with go-tpm's `PolicyCalculator`, replacing the hand-written hashes in `core/attest` (`slotpolicy.go`, `releasekey.go`, `bootkey.go`), `core/vaultproto`, `assh/hostkey/policy.go`, `signed.go`. Byte-identical digests, shown by tests with fixed expected values taken **before** the change, and against a real TPM session. Where the calculator cannot express something, the hand-written line stays, with why.
+  - Done: tpm2-kira `2be69df`; the fixed values were taken before the change (`.local/runs/g4/golden.txt`), `TestPolicyDigestsFixed`, `TestSignedPolicyFixed`, `TestSlotPolicyDigestIsTheTPMs`. aSSH already used the calculator: nothing to replace. `ApprovedPolicy` stays by hand: it goes on from a digest. `ApprovalDigest` and the PCR composite are no session's digest.
+- [x] G5. Tests: each suite; because `core` changes: `./pin tpm2-kira`, the vault's tests, Marify's emulator test; the VM test and the hibernate test on both machines, in parallel; safearch `tests/run.sh` after `./pin assh`. Then `docs/SECURITY-BACKGROUND.md` follows (the finding moves out of §18, the format section, §17's results).
+  - Done (`.local/runs/g5/`, tpm2-kira `75121e2`): VM test Arch 157, Debian 148; hibernate test Arch 137, Debian 126, 0 failed, the "not tested" items of §18; `make test-all` 937; aSSH 81; go-uefi-slim 46; vault 26; safearch 335, 1 skipped; Marify ALL PASS. `tests/vm.sh` not run again: aSSH's behaviour did not change. `-global ICH9-LPC.noreboot=true` (tpm2-kira `73d53dc`) cures the resumed guest's reset (same boot_id 75 s after the first login); `fresh`'s PCRs 0-9, 11, 14, 15 do not move. A real radio on a VM: not shown.
+
+Not now: the swtpm helper's 4 copies, the TPM open retry's 2 copies (medium and low priority in the review).
+
+Follow-up: `uki.MeasuredSections` lacks `.dtbauto`, `.profile`, `.hwids` and `.efifw`, which systemd-measure 262 knows; a UKI with them is predicted wrong (the check against the event log should catch it at a seal, untested). Left as it is by the owner's decision.
+
+---
+
 # PLAN: the SSH CA closes by PCR 15 (V2), the TOTP close and GRUB's `break=`
 
 Status: **confirmed (2026-11-01), in progress.**

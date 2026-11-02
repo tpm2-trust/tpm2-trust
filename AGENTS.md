@@ -98,7 +98,7 @@ AGENTS.md applies inside it and goes into detail; this file is the map.
 | `marify/` | Marify, the phone app: attests a boot over Bluetooth LE, keeps the phone salt | Kotlin (Android), Swift (iOS), the Go core bound with gomobile | APKs (`build-packages.sh apk`) |
 | `safearch/` | a read-only, signed Arch image (mkosi) whose identity is aSSH's | shell, mkosi | images, releases (`build.sh`, `release.sh`) |
 | `tpm2-verifier/` | EK certificate chains of TPM vendors; the curated EK root store every project uses (`ekroots`: the vendor data embedded, checked against its signed manifest) | Go, `github.com/tpm2-trust/tpm2-verifier` | binaries, packages; a library |
-| `go-uefi-slim/` | UEFI for Go on Linux: EFI variables (`efivar`), and Secure Boot's signature databases, signed updates and Authenticode, in what sbctl writes and reads; the standard library and x/sys alone | Go, `github.com/tpm2-trust/go-uefi-slim` | a library |
+| `go-uefi-slim/` | UEFI for Go on Linux: EFI variables (`efivar`), Secure Boot's signature databases, signed updates and Authenticode, in what sbctl writes and reads, and unified kernel images (`uki`: sections, PCR 11's measurements, `.pcrsig`); the standard library and x/sys alone | Go, `github.com/tpm2-trust/go-uefi-slim` | a library |
 
 Where they are published: github.com/tpm2-trust/<directory> - this
 workspace as `tpm2-trust/tpm2-trust` - except tpm2-kira, which is
@@ -137,8 +137,8 @@ flowchart LR
 | tpm2-kira | its core (`github.com/mrwiora/tpm2-kira/core`) | `replace ./core`: the same repository | - |
 | Marify | the core's `mobile/kiracore` (and `kiratest`), with `attest/` and `transport/frame` | `core.properties` (a commit of tpm2-kira) | `./pin tpm2-kira` |
 | tpm2-kira-vault | the core's `attest/` and `vaultproto/` | submodule `tpm2-kira/`, `replace ./tpm2-kira/core` in go.mod | `./pin tpm2-kira` |
-| aSSH | go-uefi-slim's `efivar` (`persist`: its CA in an EFI variable) | submodule `assh/go-uefi-slim`, `replace ./go-uefi-slim` in go.mod (safearch's build of the command takes it nested: `assh/go-uefi-slim`) | `./pin go-uefi-slim` |
-| tpm2-kira | go-uefi-slim (its own EFI variables, Secure Boot) | submodule `tpm2-kira/go-uefi-slim`, `replace ./go-uefi-slim` in go.mod (aSSH's replace does not reach it) | `./pin go-uefi-slim` |
+| aSSH | go-uefi-slim's `efivar` (`persist`: its CA in an EFI variable), `uki` (PCR signatures) | submodule `assh/go-uefi-slim`, `replace ./go-uefi-slim` in go.mod (safearch's build of the command takes it nested: `assh/go-uefi-slim`) | `./pin go-uefi-slim` |
+| tpm2-kira | go-uefi-slim (its own EFI variables, Secure Boot, `uki`) | submodule `tpm2-kira/go-uefi-slim`, `replace ./go-uefi-slim` in go.mod (aSSH's replace does not reach it) | `./pin go-uefi-slim` |
 | tpm2-kira's core (and so the phone and the vault) | tpm2-verifier's `ekroots` | submodule `tpm2-kira/tpm2-verifier`, `replace ../tpm2-verifier` in `core/go.mod` (and `./tpm2-verifier` in tpm2-kira's, `./tpm2-kira/tpm2-verifier` in the vault's) | `./pin tpm2-verifier` |
 | every Go module (aSSH, tpm2-kira, its core, the vault, tpm2-verifier) | go-tpm | one pseudo-version in each go.mod, the same everywhere: they end up in one binary; no `replace` of it anywhere; `./pin status` warns when they differ | by hand, in every module at once |
 
