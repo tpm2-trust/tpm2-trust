@@ -1,3 +1,13 @@
+# PLAN: the channel follows PCR 7 only on an explicit approval; the verifier's leak
+
+Status: **confirmed (2026-11-02), starts after the faster test runs' VM use.**
+
+- [ ] J1. tpm2-kira: `slot approve` from a hook (and `--if-moved`) never reseals the channel secrets to a moved PCR 7. Only an explicit `slot approve` by a person, or `control`, does, and it shows old and new PCR 7 and what moved it before it asks. Until then `status` and `control` are red and the phone finds no machine. An unattended approval of the slots themselves goes on as today, and says the channel was left.
+- [ ] J2. tpm2-kira: **a WARNING wherever Secure Boot is off, or in Setup Mode, in any state.** First a list of what already says so (`status`, `control`, `slot add`, `slot approve`, the hooks, the code screen at boot, the SSH session at boot, `tpm2-kira-boot`'s log), then the gaps closed; the boot's lines read the firmware's state and need no TPM. Plain and unmissable, and not a stop: "No enforced mode". Tests per place. The VM runs are in Setup Mode, so they show it. Also the owner's question in the report: which of these should also be red for the phone or vault.
+- [ ] J3. tpm2-verifier: `possession/possession.go:308`'s `tpm2.Policy` callback becomes an explicit, flushed session; a test; `./pin tpm2-verifier`; `core`'s, the vault's and Marify's tests as the workspace's table says.
+
+---
+
 # PLAN: faster test runs
 
 Status: **done (2026-11-02), I1-I6.** Confirmed by the owner. The owner: implement all. Where the time goes, from the last run: a boot is about 43 s on Arch, of it Argon2id 11 s (Debian's run: 30 s); hibernate steps 90-210 s; the hibernate test repeats the VM test's setup; fixed sleeps.
