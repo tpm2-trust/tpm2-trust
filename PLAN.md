@@ -1,11 +1,27 @@
+# PLAN: faster test runs
+
+Status: **confirmed (2026-11-02), starts after the H steps' VM pass.** The owner: implement all. Where the time goes, from the last run: a boot is about 43 s on Arch, of it Argon2id 11 s (Debian's run: 30 s); hibernate steps 90-210 s; the hibernate test repeats the VM test's setup; fixed sleeps.
+
+- [ ] I1. A time for every step in `tools/vmtest.py` and `tools/hibernatetest.py` (the report and the output), a summary of the slowest at the end. First, so the rest is measured: the run before and after each step below.
+- [ ] I2. The hibernate test starts from a setup already made (a snapshot of its own tag, shared with the VM test where the state is the same, `--save-setup`), never `fresh` or `export` overwritten; a run from `fresh` remains what a final proof is.
+- [ ] I3. Fixed sleeps go: `hibernatetest.py:552` (15 s), `vmtest.py`'s 5 s after a boot, and the others: wait for the state (AGENTS: "they wait for a state, never for a time").
+- [ ] I4. Guest memory below 4 GB, as low as is measured to hold: Argon2id's 1 GiB must never reach swap, and the hibernate image must still fit. Both machines; PCRs unchanged (`fresh`'s, as `noreboot`'s check did).
+- [ ] I5. Argon2id cheaper in test boots only. The cost stays a constant of the code; only a Go build tag (not a flag, an environment variable, a config or the LUKS token: anything at run time would be a downgrade an attacker could reach) gives a test build a lower one, and `tools/vmtest.py --fast-kdf` builds that. A test shows a release build (no tag) has the real cost and that the real packages carry no trace of the tag. **A final proof runs without it**, and a report says which it was. Disks enrolled with one cost don't open with the other.
+- [ ] I6. The numbers before and after, in `docs/TESTING.md`.
+
+---
+
 # PLAN: PCR 7 in the channel secrets' policy; the go-tpm session leak
 
-Status: **confirmed (2026-11-02), in progress.** The extra PCRs for tpm2-kira are open below.
+Status: **confirmed (2026-11-02), done (2026-11-02).**
 
-- [ ] H1. go-tpm (`go-tpm/`, a new branch `fix/policy-init-leak` from `main`, not on `feat/hierarchy`): a session whose `Init` fails after `StartAuthSession` (a failing `tpm2.Policy` callback) is flushed; today `execute()` returns without `CleanupFailure` and three failures end in `TPM_RC_SESSION_MEMORY`. A test that fails without the fix; the PR text in `.local/`; no PR opened.
-- [ ] H2. tpm2-kira: the three callback sessions (`nvslot/policy.go`, `nvslot/nvram.go`, `phonegate/tpm.go`) use explicit sessions that are flushed, as `channel.go` does, until the fix is upstream. A test: repeated failures on one connection never end in `TPM_RC_SESSION_MEMORY`.
-- [ ] H3. The channel secrets' first branch becomes `PolicyPCR(7 as sealed, 15 == 0)`, in one constant: a Microsoft-signed live USB and Secure Boot off no longer open them. The signed branch stays. A moved PCR 7 (db or dbx update) means sealing them again with the signing key: `status` and `control` say so, and `slot approve` does it. Debian's edited GRUB entry still opens them (PCR 7 unchanged): stays in the accepted risks. A changed PCR 7 means no gate: the phone finds no machine. safearch has no channel secrets; its seals already read 7 and 15.
-- [ ] H4. Open: more PCRs for tpm2-kira's channel secrets (the owner's question).
+- [x] H1. go-tpm (`go-tpm/`, a new branch `fix/policy-init-leak` from `main`, not on `feat/hierarchy`): a session whose `Init` fails after `StartAuthSession` (a failing `tpm2.Policy` callback) is flushed; today `execute()` returns without `CleanupFailure` and three failures end in `TPM_RC_SESSION_MEMORY`. A test that fails without the fix; the PR text in `.local/`; no PR opened.
+  - Done: `go-tpm` `fix/policy-init-leak` `c826212`, from the fork's `main` = upstream `c395998`. On `golang:1.24`: 611 passed, 0 failed (`.local/runs/h1/fixed-all.log`); without the fix 4 of the 5 new tests fail (`.local/runs/h1/without-fix.log`; the fifth guards the retry). PR text: `.local/go-tpm-PR-policy-init-leak.md`. No PR opened; nothing in the workspace uses the branch.
+- [x] H2. tpm2-kira: the three callback sessions (`nvslot/policy.go`, `nvslot/nvram.go`, `phonegate/tpm.go`) use explicit sessions that are flushed, as `channel.go` does, until the fix is upstream. A test: repeated failures on one connection never end in `TPM_RC_SESSION_MEMORY`.
+  - Done: tpm2-kira `10b54a9`; `TestFailuresLeaveNoSession`, which fails with the flushes taken out (`.local/runs/h2/mutation.log`). Probe of the unfixed go-tpm on the Arch VM: the 4th failure on one file is `TPM_RC_SESSION_MEMORY` on `/dev/tpmrm0` and `/dev/tpm0`; closing clears `tpmrm0`, not `tpm0` (`.local/runs/h2/probe.log`). A real boot reaches it on `/dev/tpmrm0` only in a boot nobody approved, with no change of verdict, except a slot that would open after three refused ones on one connection.
+- [x] H3. The channel secrets' first branch becomes `PolicyPCR(7 as sealed, 15 == 0)`, in one constant: a Microsoft-signed live USB and Secure Boot off no longer open them. The signed branch stays. A moved PCR 7 (db or dbx update) means sealing them again with the signing key: `status` and `control` say so, and `slot approve` does it. Debian's edited GRUB entry still opens them (PCR 7 unchanged): stays in the accepted risks. A changed PCR 7 means no gate: the phone finds no machine. safearch has no channel secrets; its seals already read 7 and 15.
+  - Done: tpm2-kira `d62a72d` (blob 20), docs in the commit after it; `TestChannelFollowsPCR7`, `TestChannelSealedForTheNextBoot`, `TestChannelSecretsSealed`. `make test-all` 944 passed, 8 skipped, 0 failed (`.local/runs/h3/test-all.log`); VM test Arch 157, Debian 148, 0 failed (`.local/runs/h3/vmtest`); hibernate test Arch 137, Debian 126, 0 failed, the same "not tested" items as before (`.local/runs/hibernatetest-20261102-015120`). `core` did not change: no `./pin tpm2-kira`, the vault and Marify not run. Not shown: a gate opening the object in a VM's initrd, a real db or dbx update.
+- H4. Decided (2026-11-02): tpm2-kira's channel secrets stay at PCR 7 and 15 for now. More PCRs would silence the phone in the cases it exists to report; on GRUB, 8 and 9 would close the `break=` route, at a reseal per rebuild. The list is in one place, if that changes.
 
 ---
 
