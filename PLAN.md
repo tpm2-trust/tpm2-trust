@@ -1,14 +1,22 @@
 # PLAN: nothing that holds the passphrase reaches swap or a core file
 
-Status: **confirmed (2026-11-02), starts after K1-K3.** Today: the terminal's passphrase buffer is `mlock`ed (its error ignored), nothing else is: not the pipe path (a growing slice), Argon2id's 1 GiB, the derived key and salt or the Go heap; only the boot's unlock server is not dumpable. At boot the initrd has no swap. `luks enrol` and `phone salt enrol` on the running system are the gap.
+Status: **code done, proof blocked (2026-11-02).** tpm2-kira `082f908` and the docs after it, aSSH `8c18175`, safearch `f9c8745`. **Blocked: `~/transfer-ai` is gone, and with it the base images of both VMs** (`disk.qcow2` of each has it as its backing file, `fresh` and `export` included): `qemu-img: Could not open backing file`. No VM test, hibernate test or `tests/vm.sh` can run until the images are back or the machines are made again; the owner decides.
 
-- [ ] L1. One helper, first thing in every installed-system command that handles a passphrase, a salt or a derived key: `mlockall(MCL_CURRENT | MCL_FUTURE)` and `PR_SET_DUMPABLE=0`, on all threads as aSSH's rule says (`sandbox`'s way). A lock that fails stops the command with an error **before** the passphrase is asked. Find every such command; a test lists them.
-- [ ] L2. At boot: best effort, said in the log; a failure never withholds a prompt (No enforced mode), and K1's measured memory floor holds with the lock on (a locked heap is what K1 frees).
-- [ ] L3. `ReadPassphrase`'s non-terminal path uses the same fixed locked buffer as the terminal's; `mlock`'s error is handled; what's read is wiped on every way out.
-- [ ] L4. aSSH: the same review for what holds the PIN. Report; change only with the same helper in `sandbox`, and what uses it.
-- [ ] L5. Tests: `VmLck` in `/proc/self/status` covers the process, not dumpable, a refused lock stops before the prompt (a low `RLIMIT_MEMLOCK` without `CAP_IPC_LOCK`). `docs/DISK-KEY.md` and `docs/SECURITY-BACKGROUND.md` say what is. VM test: an enrolment on Debian, which has swap, leaves swap untouched.
+Before: the terminal's passphrase buffer was `mlock`ed (its error ignored), nothing else; only the boot's unlock server was not dumpable.
 
-What breaks: such a command on a machine too small to lock Argon2id's 1 GiB now fails instead of swapping.
+- [x] L1. `sandbox.LockMemory` (aSSH): `mlockall(MCL_CURRENT | MCL_FUTURE | MCL_ONFAULT)`, `PR_SET_DUMPABLE=0`; first thing in `control`, `luks derive`, `enrol`, `remove`, `vault enrol`, `phone salt enrol`, `rotate`; a refused lock stops before the prompt. `secrets_test.go` lists them, and finds by name what in `internal/admin` comes to something secret.
+  - **`MCL_ONFAULT` is added to what was confirmed.** The kernel refuses `MADV_DONTNEED` on locked memory, the runtime then maps over it, and `MCL_FUTURE` alone populates that mapping: resident 1097 MiB after `FreeOSMemory`, against 8 MiB (Arch VM, `.local/runs/l/probe/arch-4096*.log`). K1 would have been undone. The same guarantee: docs/DISK-KEY.md, "Memory".
+  - Any limit without `CAP_IPC_LOCK` is refused, however large: a mapping past it is fatal for the Go runtime.
+- [x] L2. `run` and `unlock-key`: best effort, one line in the log, no stop (a container: `run` goes on, `.local/runs/l/docker/nocap.log`). `ssh-child`, `gate-child` do not lock; the table in docs/DISK-KEY.md. **The floor with the lock on is not measured**: `MinMemoryMiB` stays 1620, unproven with the lock; the probe's peak and what remains are as without it.
+- [x] L3. The pipe's path in the same fixed buffer (past 512 bytes an error), `mlock`'s error said once, wiped on every way out, also the one-byte buffers and the SSH session's read buffer. `TestReadPassphraseWipesOnEveryWayOut`, `TestPassphraseBufferUnlockedGoesOn`.
+- [x] L4. aSSH reviewed: `ca create`, `ca approve`, `ca pin`, `tpm da` held the PIN and the lockout authorization unlocked and dumpable, on machines with swap, in growing slices (`io.ReadAll`, `append`). So the helper is aSSH's. Now locked before the first read, one buffer; root stops on a refusal, a user with the usual limit goes on and is told. **WARNING, left:** `assh agent`/`serve` hold host keys' authorization values not dumpable but not locked; on an installed system they can reach swap, against "no secret of a host key is stored". Not a PIN: not changed, the owner's call.
+- [ ] L5. Unit and integration done; docs done. `tools/vmtest.py`'s `check_memory_lock` (refused, `VmLck` at the prompt, `VmSwap` under a hog on Debian) and the boot's lock line are **written and have never run**: no machines.
+
+Measured so far: `make test-all` 1061 passed, 8 skipped, 0 failed, no `(cached)`, on the code of `082f908` (`.local/runs/l/test-all-1.log`), not the final proof. aSSH's `go test ./...` passes; safearch `tests/run.sh` 335 passed, 0 failed, 1 skipped after `./pin assh` (`.local/runs/l/safearch-run.log`). Real `luks derive` at the real cost in a container, with `CAP_IPC_LOCK`: `VmLck` 1242, then 2269 MiB, resident 1041 MiB, `VmSwap` 0 (`.local/runs/l/docker/cap2.log`). Debian VM, a probe of the same calls under a hog: the process's swap 35712 kB unlocked, 0 locked (`.local/runs/l/probe/debian-pressure.log`).
+
+To do once there are machines: the VM test at 1792 MiB at the real cost (`.local/runs/l/mem/`: the floor), then the final proof, `tests/vm.sh` with it.
+
+What breaks: such a command on a machine too small to lock Argon2id's 1 GiB is killed for memory instead of swapping. Such a command as root without `CAP_IPC_LOCK` under a limit on locked memory (a container) stops. A passphrase of more than 512 bytes on a pipe is an error. `assh ca` and `tpm da` as root likewise; as a user they say so and go on.
 
 ---
 
