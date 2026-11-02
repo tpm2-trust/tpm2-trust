@@ -1,3 +1,14 @@
+# PLAN: PCR 7 in the channel secrets' policy; the go-tpm session leak
+
+Status: **confirmed (2026-11-02), in progress.** The extra PCRs for tpm2-kira are open below.
+
+- [ ] H1. go-tpm (`go-tpm/`, a new branch `fix/policy-init-leak` from `main`, not on `feat/hierarchy`): a session whose `Init` fails after `StartAuthSession` (a failing `tpm2.Policy` callback) is flushed; today `execute()` returns without `CleanupFailure` and three failures end in `TPM_RC_SESSION_MEMORY`. A test that fails without the fix; the PR text in `.local/`; no PR opened.
+- [ ] H2. tpm2-kira: the three callback sessions (`nvslot/policy.go`, `nvslot/nvram.go`, `phonegate/tpm.go`) use explicit sessions that are flushed, as `channel.go` does, until the fix is upstream. A test: repeated failures on one connection never end in `TPM_RC_SESSION_MEMORY`.
+- [ ] H3. The channel secrets' first branch becomes `PolicyPCR(7 as sealed, 15 == 0)`, in one constant: a Microsoft-signed live USB and Secure Boot off no longer open them. The signed branch stays. A moved PCR 7 (db or dbx update) means sealing them again with the signing key: `status` and `control` say so, and `slot approve` does it. Debian's edited GRUB entry still opens them (PCR 7 unchanged): stays in the accepted risks. A changed PCR 7 means no gate: the phone finds no machine. safearch has no channel secrets; its seals already read 7 and 15.
+- [ ] H4. Open: more PCRs for tpm2-kira's channel secrets (the owner's question).
+
+---
+
 # PLAN: the slot's channel secrets sealed; shared code where it belongs
 
 Status: **confirmed (2026-11-01), done (2026-11-02).** Order below is the owner's: the highest priority first, then the helpers the libraries already have.
