@@ -1,3 +1,13 @@
+# PLAN: Argon2id's memory; Arch's slow resume; Secure Boot off is red on the phone and the vault
+
+Status: **confirmed (2026-11-02), in progress.**
+
+- [ ] K1. `debug.FreeOSMemory` after `diskkey.Combine` (and wherever the boot's Argon2id output is done with). Measured: `tpm2-kira-boot`'s heap stays 2.1 GiB after two derivations, the keyslot's Argon2id on top: at 3072 MiB a boot after a wrong pepper hits the OOM killer, at 2048 MiB a plain typed boot on Arch. Then the boots at 3072 and 2048 MiB again, and the real minimum measured: into docs and `control`'s status (red below it). If 1 GiB of Argon2id plus the keyslot's own cannot be made to fit, say what the floor is.
+- [ ] K2. Arch's V2: about 205 s between the prompts and ssh, against about 30 s from `hib-setup`, and not Argon2id (`--fast-kdf` 212 s). Find the cause with evidence; a product cause is fixed, a test machine's reported; say which.
+- [ ] K3. Secure Boot off, or Setup Mode, or not readable: **red on the phone and at the vault.** Established from what the TPM vouches for (the quote's PCR 7 and the event log replayed against it), never from what the machine says. A protocol change in `core`, if needed: Marify's Kotlin and Swift screens, the vault's device view, audit and CLI. No change to what releases unless the owner decides it: the vault's approvals of PCR 7 already refuse a changed state: report whether that holds.
+
+---
+
 # PLAN: the channel follows PCR 7 only on an explicit approval; the verifier's leak
 
 Status: **confirmed (2026-11-02), done (2026-11-02).** Final proof at tpm2-kira `7fec830`, without `--fast-kdf`, from `fresh`: VM test Arch 195, Debian 189 checks, 0 failed (`.local/runs/j/final/vmtest`); hibernate test Arch 157, Debian 146, 0 failed, the same "not tested" items as before: Arch V3, Debian V2 and V4-reverted, Debian V4 step 5's resume (`.local/runs/j/final/hib`). A first hibernate run stopped on Arch's V8, "systemd-boot's menu did not show" in all 4 tries, 0 failed checks before it, the same commit passed from `fresh` next (`.local/runs/j/final/hib-1-arch-v8-menu`). The menu comes before anything this work changed, and the test's key at the loader is a known race, but the cause is not shown. `make test-all` 1031 passed, 8 skipped, 0 failed, no `(cached)` (`.local/runs/j/test-all-final.log`).
