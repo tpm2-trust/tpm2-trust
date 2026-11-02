@@ -1,3 +1,17 @@
+# PLAN: waits that expire for nothing; tests that belong together
+
+Status: **confirmed (2026-11-03), in progress; before M1-M3.** The owner: a wait for an input makes sense, one that only expires does not; move together the tests that make sense; a minute over 15 is no problem, an hour is.
+
+- [ ] Q1. tpm2-kira, one answer per boot: machine-id, `run` and the close each wait for the TPM's device by themselves (5 s, 5 s, 30 s); what one learned in this boot the others read from `/run/tpm2-kira` and don't wait again.
+- [ ] Q2. The counted boot (step 6, after the one hard reboot) doesn't wait 30 s again: straight to the passphrase; the late closer keeps trying.
+- [ ] Q3. `FailureAction=reboot-force`'s "proceeding in 5s": is `reboot-immediate` free of it? If it is, it replaces it, in tpm2-kira and safearch; the state nothing else can reach in those seconds stays so.
+- [ ] Q4. "The system going down" takes 21 s in the unapproved scenario, about 1 s elsewhere: find the cause (a stop job?); a product defect is fixed if small, reported if not.
+- [ ] Q5. Test tools: hibernation tools only when a hibernate scenario runs, and cheaply; the no-VM parts start when setup is done.
+- [ ] Q6. Scenarios that belong together share a boot: what a boot shows anyway is checked there, not in a boot of its own. A list of what merged into what.
+- [ ] Q7. The limit: 15 minutes is the target; up to 16 passes, and the report names what went over; beyond it stops, as now. One full proof at the end.
+
+---
+
 # PLAN: the 15-minute proof
 
 Status: **confirmed (2026-11-03); P1-P4 done, P5 failed by 9 s on Debian, awaits the owner's word.** Debian's free slot goes to the failure path (silent TPM), not the unapproved image. Replaces N's target ("no check dropped"): the owner sets 15 minutes for the full test and asks which scenarios represent the code changes. Scenarios, budgets, times and what no depth covers: tpm2-kira `docs/TESTING.md`, "Test depths".
