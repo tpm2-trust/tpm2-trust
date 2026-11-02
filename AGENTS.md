@@ -227,14 +227,25 @@ change: which former functionality breaks, and what the owner has to redo.
 
 ### What to test after a change
 
+Test by what changed, and no more; the full proof belongs to the end of a batch.
+
 | Changed | Run |
 |---|---|
-| `assh/` | its tests (`go test ./...`, swtpm); tpm2-kira's suite against it (`go.work`); safearch's `tests/run.sh` after `./pin assh` |
-| tpm2-kira's `internal/`, the boot integration | `make test-all` (unit and integration, swtpm); `tools/vmtest.py --target both` on fresh VMs |
-| `tpm2-kira/core/` | the above (`make test-unit` runs the core's tests in `core/`), the vault's tests, Marify's `android/scripts/test-emulator.sh` (JVM, emulator and swtpm tests) after `./pin tpm2-kira` |
-| `tpm2-kira-vault/` | its tests; `tools/vmtest.py` (the vault steps) |
-| `go-uefi-slim/` | its tests (the immutable test as root on a VM); aSSH's and tpm2-kira's suites after `./pin go-uefi-slim`; the VM test |
-| `safearch/` | `tests/run.sh` (and `tests/vm.sh` for a boot) |
+| Docs only | nothing |
+| Test tools | the affected step alone (`hibernatetest.py --only STEP`) |
+| Installed-system code of tpm2-kira (`control`, `status`, the admin commands) | `make test-all` |
+| tpm2-kira's boot, close or unlock | `make test-all`; `tools/vmtest.py --fast-kdf`; the affected hibernate steps, from a saved setup |
+| Argon2id, or what memory the boot takes | as above, at the real cost (without `--fast-kdf`), on the affected boots |
+| `tpm2-kira/core/` | as for the boot; the vault's tests. Marify's `android/scripts/test-emulator.sh` at the end of the batch, after `./pin tpm2-kira` |
+| `assh/` | its tests (`go test ./...`, swtpm); tpm2-kira's `make test-all` against it (`go.work`); safearch's `tests/run.sh` after `./pin assh` |
+| `tpm2-kira-vault/` | its tests; the vault steps of `tools/vmtest.py` at the end of the batch |
+| `go-uefi-slim/` | its tests (the immutable test as root on a VM); aSSH's and tpm2-kira's suites after `./pin go-uefi-slim` |
+| `tpm2-verifier/` | its tests; `core`'s and the vault's after `./pin tpm2-verifier` |
+| `safearch/` | `tests/run.sh`; `tests/vm.sh` at the end of the batch, when the boot changed |
+
+**The final proof, once per batch, before the owner pushes:** `GOFLAGS=-count=1 make test-all` with nothing `(cached)`; `tools/vmtest.py --target both` and `tools/hibernatetest.py --target both --no-build`, from `fresh` and without `--fast-kdf`; and those of the rows above that the batch touched. A run with `--fast-kdf` or from a saved setup is never the proof; a report says which it was. The failure paths (hibernate's V4, V8, V9) run only when the close or the boot changed, and in the final proof.
+
+**A run of yours:** iterate from a saved setup (`--save-setup`, `--only`; `docs/TESTING.md`). A wait for a run ends on the run's failure too, not only on the line it hopes for. Stage what you changed by name: a shared checkout may hold another agent's work.
 
 The VM test and the emulator test run without anyone at the keyboard from
 a defined state (tpm2-kira `docs/TESTING.md`, Marify `android/TESTING.md`);
