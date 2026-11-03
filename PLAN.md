@@ -1,3 +1,15 @@
+# PLAN: go-attestation where it helps
+
+Status: **confirmed (2026-11-03), not started; after U's small fixes.** `core` keeps its rule (no device dependencies: go-attestation stays out of it), and the quote code stays.
+
+- [ ] V1. **First: `core`'s own parsers against go-attestation's real logs.** K3's and M3's replay (`EstablishSecureBoot`, `EstablishInitrd`) has seen OVMF and two VMs; since M2 "not established" means the vault refuses. A test in `internal/measure` runs both over `attest/testdata` and reports where they differ. Fix what it finds; a firmware's oddity documented, not silently accepted. No import in `core`.
+- [ ] V2. `ParseSecurebootState` on the machine, in `control` and `status`: who signed the boot, what PK, KEK, db and dbx hold (names what's neither the owner's nor Microsoft's), `DMAProtectionDisabled`. Not sent to the phone. Its parse failures are said.
+- [ ] V3. `EventLog.Verify` where the machine compares the log with the registers, if that's not covered already.
+
+**Upstream:** what go-attestation should do itself goes to the owner's fork (`go-attestation/`, in the workspace's root), each change on a branch of its own, from its main; never on main, nothing pushed, a PR text in `.local/`, as for go-tpm. A `replace` of go-attestation is not used until the owner says.
+
+---
+
 # PLAN: the YubiKey's PIN as bytes, from a descriptor; no environment variable
 
 Status: **done (2026-11-03): `make test-all`; no VM, no proof, the owner's call.**
