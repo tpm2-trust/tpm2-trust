@@ -1,8 +1,43 @@
 # PLAN: go-attestation where it helps
 
-Status: **confirmed (2026-11-03), not started; after U's small fixes.** `core` keeps its rule (no device dependencies: go-attestation stays out of it), and the quote code stays.
+Status: **V1 done (2026-11-03), V2 and V3 not started. V1 changed `core`: Marify's emulator test (after `./pin tpm2-kira`) and a proof are still to run, the owner's call.** `core` keeps its rule (no device dependencies: go-attestation stays out of it), and the quote code stays.
 
-- [ ] V1. **First: `core`'s own parsers against go-attestation's real logs.** K3's and M3's replay (`EstablishSecureBoot`, `EstablishInitrd`) has seen OVMF and two VMs; since M2 "not established" means the vault refuses. A test in `internal/measure` runs both over `attest/testdata` and reports where they differ. Fix what it finds; a firmware's oddity documented, not silently accepted. No import in `core`.
+- [x] V1. **First: `core`'s own parsers against go-attestation's real logs.** K3's and M3's replay (`EstablishSecureBoot`, `EstablishInitrd`) has seen OVMF and two VMs; since M2 "not established" means the vault refuses. A test in `internal/measure` runs both over `attest/testdata` and reports where they differ. Fix what it finds; a firmware's oddity documented, not silently accepted. No import in `core`. Done: tpm2-kira `ea471df`. The logs come from the module go.mod requires, by `go list -m` (v0.6.4; identical to the fork's master 6f394f5, byte for byte), not copied; go.sum vouches for them, no skip, and a file with no row fails. Replayed registers, as there is no quote; the three whose real PCR 7 is known (windows dump, sb_cert, option_rom) replay to it.
+
+  | Log | Bank | core | go-attestation | Initrd | Why they differ |
+  |---|---|---|---|---|---|
+  | coreos_36 | SHA-256, SHA-1 | off | disabled | covered (GRUB's command) | |
+  | crypto_agile | SHA-256 | off | error: length 0 | no events | the variable absent: neither says on |
+  | ebs_event_missing | SHA-1 | off | disabled | no events | |
+  | option_rom | SHA-1 | **on** | enabled | not established (no such event) | |
+  | sb_cert | SHA-256, SHA-1 | **on** | enabled | no events | |
+  | short_no_action | both | not established | disabled, no error | nothing in PCR 7: an upstream defect below |
+  | ubuntu_2104 | SHA-256, SHA-1 | off | disabled | not established: right, this boot ran no `initrd` (initrdless attempt) | |
+  | windows_gcp (dump) | SHA-1 | **on** | enabled | not established | |
+  | ours, debian13-grub | SHA-256 | setup mode | disabled | - | it has no such state |
+
+  A bank a log does not have (the SHA-256 of a SHA-1 log, the SHA-1 of crypto_agile): not established; an error. On or not agrees everywhere, with no relaxation. **The corpus cannot find what it holds no example of: 3 of 8 logs say on, and none is a firmware with a debugger, an error separator, a data-only digest, a missing separator or a duplicate.** So these were made from the 3 real logs (`TestFirmwareOddityIsNotOn`), from reading `secureboot.go`:
+
+  | What a firmware does | go-attestation | core before | core now |
+  |---|---|---|---|
+  | `UEFI Debug Mode` before the separator | refuses | **on** | not established (fixed) |
+  | The separator of the error value | refuses | **on** | not established (fixed) |
+  | No PCR 7 separator | **enabled** (upstream defect) | not established | same |
+  | SecureBoot twice, or 1 and 0 | refuses | not established | same |
+  | Digest over the data alone | refuses | not established | same: documented, stays refused |
+  | SecureBoot after the separator | refuses | not established | same |
+  | SecureBoot = 2 | disabled, no error (upstream defect) | not established | same |
+  | SecureBoot = 1, no authority event | refuses | **on** | on: left, below |
+
+  `eventlog_workarounds.go` is PCR 5 alone (Exit Boot Services), which `core` does not read. Bug 157's shim authority (a byte too many in the event) is after the separator: an opaque digest here, on as go-attestation has it. SHA-1-only and crypto-agile logs: by bank, as the table says.
+
+  **Machine side:** `chainOf` put an EV_NO_ACTION's digest in the chain, which would not replay and would make a vault refuse; left out now, as go-attestation's replay does. No log here has one in those registers.
+
+  **Left, for the owner:** `on` with no authority event. go-attestation has the data and refuses; a chain of digests cannot name one before the separator, and a firmware may measure a certificate once (edk2's behaviour as remembered, not checked here), so "nothing after the separator" could refuse a good machine. Held by the test, documented in §13.5. Also not read: `DMA Protection Disabled` (V2).
+
+  **Upstream:** go-attestation branch `fix/secureboot-state-undetermined` (`0a3fec4`, from master, not pushed, no `replace`): no SecureBoot variable, no separator, or a value not 0 or 1 is an error. PR text: `.local/go-attestation-PR-secureboot-state.md`.
+
+  **Tests:** `make test-all` with `GOFLAGS=-count=1`: 586 top-level passed, 0 failed, 3 skipped (`TestSystemdCryptsetupUnlocksThroughTpm2Kira`, `TestLuksEnrolOnAnImage`, `TestLiveDaemon`: root for a loop device, a running pcscd), nothing `(cached)` (`.local/runs/v/test-all-v.log`). The vault's, with and without `integration`, against this checkout (`vault-tests.log`). The corpus's own lines: `corpus.log`. 12 mutations, each failed by its test (`mutate_v.py`, `mutate_v.log`). **Not run: Marify's emulator test, the proof, `./pin tpm2-kira`, a VM.**
 - [ ] V2. `ParseSecurebootState` on the machine, in `control` and `status`: who signed the boot, what PK, KEK, db and dbx hold (names what's neither the owner's nor Microsoft's), `DMAProtectionDisabled`. Not sent to the phone. Its parse failures are said.
 - [ ] V3. `EventLog.Verify` where the machine compares the log with the registers, if that's not covered already.
 
@@ -20,9 +55,15 @@ Status: **done (2026-11-03): `make test-all`; no VM, no proof, the owner's call.
 
 **String conversions left:** none of the PIN in product code; no library takes it (`piv`, `pcsc` are ours, the APDU goes to the socket as bytes). Not ours: `pcscd` and the card. The variable, if a script sets it, stays in this process's initial stack and `/proc/PID/environ` for its life; ignored, not read. The vault's one-time token is a string, not a PIN (R2). The emulator's `string(data)`: tests.
 
-**What breaks:** a script setting `TPM2_KIRA_PIN` gets the file or the terminal; `TPM2_KIRA_PIN=... mkinitcpio -P` under a hook: SKIPPED (the hook shows that block, its capture swallows the variable's line). `--pin-fd 0` is refused.
+**What breaks:** a script setting `TPM2_KIRA_PIN` gets the file or the terminal; `TPM2_KIRA_PIN=... mkinitcpio -P` under a hook: SKIPPED, the block saying why. `--pin-fd 0` is refused. U4: a script that chained past a bad `--pin-fd` now stops on exit 2. U6: a loose file on the descriptor is refused.
 
-**Not covered:** a real YubiKey and `pcscd`; the signer's terminal prompt on a real `/dev/tty` (`readNoEcho` on a pty only); `phone gate`, `phone enrol`, `vault`, `luks` past the bad descriptor; no VM (the boot is untouched), no proof. **For the owner, open:** a regular file on `--pin-fd` is not checked for looseness as the PIN file is; a signal at the signer's terminal prompt leaves echo off, as before (`control`'s prompt is not affected).
+**Not covered:** a real YubiKey and `pcscd`; the signer's terminal prompt on a real `/dev/tty` (`readNoEcho` on a pty only); `phone gate`, `phone enrol`, `vault`, `luks` past the bad descriptor; no VM (the boot is untouched), no proof.
+
+**The small fixes (confirmed, done 2026-11-03):**
+- [x] U4. A bad `--pin-fd` exits 2 on every command; other failures keep exit 0; help and TROUBLESHOOTING name the exception. `TPM2_KIRA_PIN` under a hook: the no-PIN reason says it is set and ignored, so Arch's SKIPPED block and Debian's two hooks show it, no value. Done: tpm2-kira `210509d`.
+- [x] U5. A signal at the signer's prompt gives the terminal back, input flushed. `prompt`'s holding of a terminal moved to `internal/termguard`, as the boot binary links `signing` and must not link `prompt`. Beyond the ask: no suspend key during the prompt (a shell takes a stopped job's terminal back, and the prompt would go on with echo on). SIGKILL still leaves it. Done: `613d0f6`.
+- [x] U6. A regular file on `--pin-fd` that others can read, or that is not root's or this user's, is refused unread; a pipe or socket is fine. A memfd is mode 0777 until `fchmod`: refused. Done: `d965032`.
+- `GOFLAGS=-count=1 make test-all`: 581 top-level passed, 0 failed, 3 skipped, nothing `(cached)` (`.local/runs/v/test-all-u.log`). 21 mutations, each failed by its test (`mutate_u.py`, `mutate_u.log`). **Open for the owner:** a wrong PIN on a good descriptor stays the token's refusal, SKIPPED or FAILED with exit 0; "bad" here is a descriptor that gives no PIN.
 
 ---
 
