@@ -220,8 +220,10 @@ change: which former functionality breaks, and what the owner has to redo.
   others use.** It shows every pin against the checkout it pins: the aSSH
   submodules, Marify's `core.properties` (the tpm2-kira commit the app
   links) and the vault's submodule `tpm2-kira/` (both moved by `./pin
-  tpm2-kira`), and go-tpm, which tpm2-kira and aSSH pin by intent and `pin`
-  shows without moving.
+  tpm2-kira`), go-tpm, which tpm2-kira and aSSH pin by intent and `pin`
+  shows without moving, and the AUR recipe's commits of tpm2-kira's submodules
+  (`packaging/aur/PKGBUILD`, which GitHub's tarballs need), shown against its
+  pins and set with its `_tag` at a release.
 - **Pinning is staging.** `pin` never commits; the commit of a new pin is
   the consuming project's, with its tests run against it.
 

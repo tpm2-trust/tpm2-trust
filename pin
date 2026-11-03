@@ -18,7 +18,8 @@
 #                       variables, Secure Boot) to go-uefi-slim's HEAD
 #
 # go-tpm is required in every Go module's go.mod: shown, compared - one
-# version for all - and moved by hand.
+# version for all - and moved by hand. So are the AUR recipe's commits of
+# tpm2-kira's submodules, shown against its pins, set with its _tag at a release.
 
 set -euo pipefail
 
@@ -64,6 +65,29 @@ where() {
 # for all, since the core, aSSH and tpm2-verifier end up in one binary.
 GOTPM_MODULES=(assh tpm2-kira tpm2-kira/core tpm2-kira-vault tpm2-verifier)
 
+# The AUR recipe builds from GitHub's tarballs, which leave submodules out, so
+# it names each submodule's commit itself: "variable path".
+AUR_PKGBUILD=tpm2-kira/packaging/aur/PKGBUILD
+AUR_PINS=("_assh assh" "_verifier tpm2-verifier" "_uefislim go-uefi-slim")
+
+# aur_status shows the recipe's commits against the submodules tpm2-kira's HEAD
+# records. Nothing moves them: they are set with the recipe's _tag, at a release.
+aur_status() {
+    local line var path want have
+    for line in "${AUR_PINS[@]}"; do
+        read -r var path <<<"$line"
+        have="$(sed -n "s/^$var=//p" "$ROOT/$AUR_PKGBUILD" | head -1)"
+        want="$(git -C "$ROOT/tpm2-kira" ls-tree HEAD "$path" | awk '{print $3}')"
+        if [[ -z $have ]]; then
+            printf '%-26s %s\n' "aur $var" "$(red "not in $AUR_PKGBUILD")"
+        elif [[ $have == "$want" ]]; then
+            printf '%-26s %s  %s\n' "aur $var" "${have:0:7}" "$(green "at tpm2-kira's pin")"
+        else
+            printf '%-26s %s  %s\n' "aur $var" "${have:0:7}" "$(red "not tpm2-kira's pin ${want:0:7}: set it with _tag, at a release")"
+        fi
+    done
+}
+
 # gotpm_status shows the go-tpm every module requires and warns when they
 # differ.
 gotpm_status() {
@@ -101,6 +125,7 @@ status() {
     local kira
     kira="$(sed -n 's/^kira.commit=//p' "$ROOT/marify/core.properties")"
     printf '%-26s %s  %s\n' "marify core.properties" "${kira:0:7}" "$(where "$ROOT/tpm2-kira" "$kira")"
+    aur_status
     gotpm_status
     local repo
     for repo in assh tpm2-kira go-uefi-slim; do
