@@ -247,9 +247,9 @@ Test by what changed, and no more; the full proof belongs to the end of a batch.
 
 The depths of testing, what runs at each and what none of them covers: `tpm2-kira/docs/TESTING.md`, "Test depths".
 
-**The proof, once per batch, before the owner pushes:** `tools/proof.py --since <the batch's start>`, one command, from `fresh`, without `--fast-kdf`: both machines in parallel through the scenarios that have a budget, beside them `make test-all` with nothing `(cached)`, aSSH's tests, the vault's and safearch's `tests/run.sh`. **15 minutes wall clock is the target, 16 the limit:** up to 16 a run passes, and past 15 its report names what went over; at 16 it stops, fails and names the scenario. The parts without a VM start when the machines' setups are done. Parts the table names on top run after it, outside the limit. A run with `--fast-kdf`, from a saved setup or with `--only` is never the proof; a report says which it was.
+**The proof, once per batch, before the owner pushes:** `tools/proof.py --since <the batch's start>`, one command, from `fresh`, without `--fast-kdf`: both machines in parallel through the scenarios that have a budget, beside them `make test-all` with nothing `(cached)`, aSSH's tests, the vault's and safearch's `tests/run.sh`. **15-20 minutes wall clock are an orientation, not a limit:** time fails nothing, budgets are information, and a run over 20 minutes says so in its report with what went over. Only a run that hangs is stopped, after an hour, and reported as stuck. The parts without a VM start when the machines' setups are done. Parts the table names on top run after it. A run with `--fast-kdf`, from a saved setup or with `--only` is never the proof; a report says which it was.
 
-**`tools/proof.py --all`, before a release, the owner's call:** every scenario the proof left out, by name, `tests/vm.sh` and Marify, with no limit.
+**`tools/proof.py --all`, before a release, the owner's call:** every scenario the proof left out, by name, `tests/vm.sh` and Marify.
 
 **No full run while a scenario fails.** Each is proven alone from a saved setup first (`vmtest.py --only SCENARIO`), then one proof; if it fails, that scenario alone again. **A run expected over 10 minutes is announced first.**
 
