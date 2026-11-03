@@ -53,8 +53,9 @@ Order: N0, N5 and N4 (small, large gain), N1, N2, N3, N6, N7, N8. M4 merges into
 
 # PLAN: the admin commands locked; the vault refuses unless Secure Boot is on; the initrd's state from the event log
 
-Status: **confirmed (2026-11-03), starts after L's final proof.**
+Status: **confirmed (2026-11-03), in progress.**
 
+- [ ] M0. Arch's image gets `cryptsetup-pre.target`, so that the close's `Before=` orders something: "before any volume is opened" becomes true on the silent TPM's path too. It changes every Arch boot's order; the proof shows it. Debian's resume stays in `--all` (decided 2026-11-03).
 - [ ] M1. `slot add`, `slot approve`, `setup` (and whatever else holds a TOTP key, a PEM signing key or a YubiKey PIN) take L1's lock, first thing. `assh agent` and `serve` stay as they are; the WARNING stays open.
 - [ ] M2. The vault releases nothing unless the quote establishes Secure Boot `on` (K3's state: the quoted PCR 7 and its events replayed). Off, Setup Mode and "not established", a slot without PCR 7 included, are refused, shown and audited; no per-device exception. Tests per state in the vault. **Decided (option A): the VM test's vault steps run with Secure Boot really on:** real keys enrolled in the machine's firmware, the UKI signed on Arch, shim with Microsoft's certificates on Debian, from a snapshot of its own next to `fresh`, made reproducibly by a script (never overwriting `fresh` or `export`). It also shows what is unproven so far: the firmware refusing a changed UKI, and a true `on` state. How the keys get enrolled (test tooling on `go-uefi-slim`, `sbctl`, or `exp/debian-uki`'s `internal/secureboot`): the agent's choice, stated in its report. Owners need a recovery keyslot: `control` says so before a vault-only recipe on a machine not `on`.
 - [ ] M3. The phone's initrd message from the event log checked against the quoted PCRs, not `BootContext.InitrdState`, which goes. "Not established" is red. If it can't be derived, the message goes, and the report says why. `core`, so the vault's tests and Marify's at the end of the batch.
