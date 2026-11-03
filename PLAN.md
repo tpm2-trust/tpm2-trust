@@ -1,3 +1,15 @@
+# PLAN: the YubiKey's PIN as bytes, from a descriptor; no environment variable
+
+Status: **confirmed (2026-11-03), next batch; not started.**
+
+- [ ] U1. `internal/signing/yubikey.go`: `readPIN`, `pinFromFile`, `StoredPIN`, `promptPINOnTTY`, `readNoEcho` move to `[]byte`, wiped after use; `PINStored` wipes what it reads. The commands that sign take `--pin-fd N`, a one-line read into the locked buffer. The order: `--pin-fd`, the PIN file, the terminal.
+- [ ] U2. `TPM2_KIRA_PIN` goes: a string, not wipeable, inherited by every child (`mkinitcpio`), readable in `/proc/PID/environ`. Docs say the file or the descriptor; `$CREDENTIALS_DIRECTORY` for a systemd unit is a redirect to `--pin-fd`.
+- [ ] U3. Tests: the emulator's token through a descriptor; a wrong PIN; the fd closed; the variable set and ignored. `make test-all`.
+
+What breaks: a script setting `TPM2_KIRA_PIN` falls through to the file or the terminal.
+
+---
+
 # PLAN: arrow keys in control's menu, without a library
 
 Status: **done (2026-11-03), proven with S and R: `.local/runs/t/proof`.** The owner tried tview + tcell (`exp/tview`, dropped): +13 modules, `infocmp` run from PATH at every start, and a full screen that hides what a step printed. So inline, in `internal/prompt`.
