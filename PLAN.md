@@ -1,3 +1,12 @@
+# PLAN: arrow keys in control's menu, without a library
+
+Status: **confirmed (2026-11-03), starts after S.** The owner tried tview + tcell (`exp/tview`, dropped): +13 modules, `infocmp` run from PATH at every start, and a full screen that hides what a step printed. So inline, in `internal/prompt`.
+
+- [ ] T1. `Select` on a terminal: up, down, Enter, inline in the scrollback, on `x/sys` alone; a greyed entry's reason shows when the cursor is on it; a number and Enter still work, so the VM test's session stays as it is; on a non-terminal the plain prompts. No alternate screen, no terminfo: plain ANSI for the terminals that have it, `TERM=dumb` plain. Terminal restored on every way out. What the menu leaves in the scrollback: the question and the answer.
+- [ ] T2. Tests with a pty: arrows, numbers, greyed entries, cancel, every signal, a wrapped long entry, a narrow terminal. `make test-all`; `control`'s scenarios alone. A proof with the next batch.
+
+---
+
 # PLAN: Debian's close before any volume
 
 Status: **confirmed (2026-11-03), starts after R, in the next batch, with its proof.**
