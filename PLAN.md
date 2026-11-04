@@ -17,7 +17,7 @@ A real machine (Lenovo, SHA-1 bank alone, systemd 262) showed "Secure Boot could
 - [x] 7. The owner's real log as a local test: `.local/`, by environment variable, skipped elsewhere; never in a published repository.
 - [x] 8. A VM check of the state on the running system.
 - [x] 9. `control`: the SHA-1 line is orange, in the overview and the boot chain's list, and no open prerequisite (owner, 2026-11-04).
-- [ ] 10. **Versions in the app (owner, 2026-11-04), not started:** `versionName` `0.1.0+<marify commit>` (`-dirty` when changed), `BuildConfig.MARIFY_COMMIT`, `BuildConfig.CORE_COMMIT` from `app/libs/CORE_COMMIT` (what was linked, not `core.properties`), and one line `Marify 0.1.0+57ec9f2 · core c900ae2 · protocol 1 · schema N` on a screen always reached, with `KiraCore.protocolVersion()`/`schemaVersion()`; iOS the same. On the screen only, never on the Bluetooth link. No change to `core`, no pin.
+- [ ] 10. **Versions in the app (owner, 2026-11-04): Android done (`feat/version-line` in marify), iOS open:** `versionName` `0.1.0+<marify commit>` (`-dirty` when changed), `BuildConfig.MARIFY_COMMIT`, `BuildConfig.CORE_COMMIT` from `app/libs/CORE_COMMIT` (what was linked, not `core.properties`), and one line `Marify 0.1.0+57ec9f2 · core c900ae2 · protocol 1 · schema N` on a screen always reached, with `KiraCore.protocolVersion()`/`schemaVersion()`; iOS the same. On the screen only, never on the Bluetooth link. No change to `core`, no pin.
 - [ ] 11. `make test-all`, `./pin tpm2-kira`, the vault's tests, Marify's emulator test, `vmtest --fast-kdf`; a package and an APK.
 
 ## What breaks
