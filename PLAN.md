@@ -1,3 +1,27 @@
+# PLAN: Secure Boot's state on a SHA-1 slot
+
+Status: **steps 1-4 written 2026-11-04, uncommitted, on branch `feat/secureboot-sha1` in tpm2-kira and marify. `make test-all`, the vault's tests against the checkout and Android's unit tests pass; the commit, the pins, the emulator and the VM scenarios are open.**
+
+## Goal
+
+A slot on the SHA-1 bank is a warning, not "take Secure Boot as off". A real log can hold SHA-256 digests alone (`~/eventlog`: bank `0xb` only), so a SHA-1 quote had no events to replay and the phone showed "could not be established (no event log)". The state stays proven, never assumed: "on" comes only from something the TPM signed.
+
+## Steps
+
+- [x] 1. **A second quote.** When the selection is on SHA-1 the machine also quotes `sha256:7` with the same qualifying data and the same attestation key, and sends the SHA-256 digests of PCR 7's events beside it (BootContext `pcr7_chain_sha256`). Phone, `phone verify` and vault establish the state from that quote: AK signature, magic and type, qualifying data, exactly `sha256:7`, the digest reproduced, then `EstablishSecureBoot`. A second quote present and wrong is not established, with no fall back to SHA-1. No second quote (no SHA-256 bank): the SHA-1 chain, as before. A machine leaving it out only loses "on".
+- [x] 2. **SHA-1 is said.** `Verdict.sha1_bank` and the enrolment event's, from the verified selection; decides nothing, the state stays what it is.
+- [x] 3. **Wording.** No events is "no events of PCR 7 in the <bank> bank: no event log, or a log without that bank": a verifier cannot tell which, and the old text said something false.
+- [x] 4. **Marify, Android and iOS:** a SHA-1 warning card (amber, not the red of Secure Boot) on the enrolment and verdict screens, parse tests, screen tests.
+- [ ] 5. Tests: `core` (protocol, the vault's check), `make test-all`, a software TPM with both banks; then the owner commits; `./pin tpm2-kira`; the vault's tests; Marify's `android/scripts/test-emulator.sh`; VM scenarios per the test table.
+
+## What breaks
+
+Nothing for a slot on SHA-256. A SHA-1 slot needs the machine's package and the APK of this change to show "on"; enrolment is not repeated for it (the fields are optional on the wire).
+
+## Open questions
+
+- Which bank the owner's machine really used (`ls /sys/class/tpm/tpm0/ | grep pcr-`, `tpm2-kira slot info`): this plan is needed either way, but the phone's red card there is not yet proven to be this case.
+
 # PLAN: go-attestation where it helps
 
 Status: **V1 done (2026-11-03), V2 and V3 not started. V1 changed `core`: Marify's emulator test (after `./pin tpm2-kira`) and a proof are still to run, the owner's call.** `core` keeps its rule (no device dependencies: go-attestation stays out of it), and the quote code stays.
