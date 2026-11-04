@@ -787,7 +787,7 @@ follow, and remove the duplicates, before more is built on top.
 1. **tpm2-kira's shared core is not a module of its own.** `attest/`,
    `transport/`, `vaultproto/` and `mobile/` depend on go-tpm and
    x/crypto alone, but the vault and Marify take them through the whole
-   `github.com/mrwiora/tpm2-kira` module: its go.mod requires aSSH
+   `github.com/tpm2-trust/tpm2-kira` module: its go.mod requires aSSH
    (replaced by a submodule), huh, go-attestation. Marify's core build has
    to edit that go.mod (drop aSSH) to build at all; the vault's module
    graph carries tpm2-kira's TUI libraries.
@@ -811,7 +811,7 @@ follow, and remove the duplicates, before more is built on top.
 
 - [x] 1. **The shared core as a module of its own** (decided: inside tpm2-kira), in tpm2-kira's
       repository: `core/` with its own go.mod
-      (`github.com/mrwiora/tpm2-kira/core`), holding `attest/`,
+      (`github.com/tpm2-trust/tpm2-kira/core`), holding `attest/`,
       `transport/`, `vaultproto/`, `mobile/`. tpm2-kira requires it
       (`replace ./core`), `go.work` uses it; the vault and Marify require
       the core alone. Marify's build-core drops its go.mod edit. The
@@ -898,5 +898,5 @@ follow, and remove the duplicates, before more is built on top.
    tpm2-verifier-vendors`)? Once its public key is in `allowed_signers`,
    `ekroots` uses signed data alone.
 5. ~~Step 7: which remotes?~~ Decided: every project in
-   github.com/tpm2-trust, tpm2-kira and the go-tpm fork in mrwiora; the
+   github.com/tpm2-trust, the go-tpm fork in mrwiora; the
    workspace is tpm2-trust/tpm2-trust. Pushing is the owner's.

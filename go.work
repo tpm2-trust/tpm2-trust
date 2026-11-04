@@ -16,7 +16,7 @@ use (
 // tpm2-kira and the vault each replace the core with their own copy
 // (./core, the vault's submodule ./tpm2-kira/core): here both take the
 // checkout.
-replace github.com/mrwiora/tpm2-kira/core v0.0.0 => ./tpm2-kira/core
+replace github.com/tpm2-trust/tpm2-kira/core v0.0.0 => ./tpm2-kira/core
 
 // tpm2-verifier, the core's EK root store: tpm2-kira's submodule and, in the
 // vault, that submodule's - here the checkout.

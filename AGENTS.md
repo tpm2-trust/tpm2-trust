@@ -93,16 +93,15 @@ AGENTS.md applies inside it and goes into detail; this file is the map.
 | Directory | What it is | Language, module | Released as |
 |---|---|---|---|
 | `assh/` | aSSH: the SSH CA and host keys in the TPM, the privilege-separated SSH server, `persist` (NV indices, EFI variables), `sandbox` (confinement) | Go, `github.com/tpm2-trust/assh` | a library; the `assh` command (built by safearch) |
-| `tpm2-kira/` | TOTP codes, phone and vault attestation, the disk's key at boot: `tpm2-kira` (installed system) and `tpm2-kira-boot` (boot image) | Go, `github.com/mrwiora/tpm2-kira` | Arch and Debian packages (`packaging/build-packages.sh`) |
+| `tpm2-kira/` | TOTP codes, phone and vault attestation, the disk's key at boot: `tpm2-kira` (installed system) and `tpm2-kira-boot` (boot image) | Go, `github.com/tpm2-trust/tpm2-kira` | Arch and Debian packages (`packaging/build-packages.sh`) |
 | `tpm2-kira-vault/` | the vault: releases a key part to a TPM quote of an approved boot, over TLS | Go, `github.com/tpm2-trust/tpm2-kira-vault` | binary, container |
 | `marify/` | Marify, the phone app: attests a boot over Bluetooth LE, keeps the phone salt | Kotlin (Android), Swift (iOS), the Go core bound with gomobile | APKs (`build-packages.sh apk`) |
 | `safearch/` | a read-only, signed Arch image (mkosi) whose identity is aSSH's | shell, mkosi | images, releases (`build.sh`, `release.sh`) |
 | `tpm2-verifier/` | EK certificate chains of TPM vendors; the curated EK root store every project uses (`ekroots`: the vendor data embedded, checked against its signed manifest) | Go, `github.com/tpm2-trust/tpm2-verifier` | binaries, packages; a library |
 | `go-uefi-slim/` | UEFI for Go on Linux: EFI variables (`efivar`), Secure Boot's signature databases, signed updates and Authenticode, in what sbctl writes and reads, and unified kernel images (`uki`: sections, PCR 11's measurements, `.pcrsig`); the standard library and x/sys alone | Go, `github.com/tpm2-trust/go-uefi-slim` | a library |
 
-Where they are published: github.com/tpm2-trust/<directory> - this
-workspace as `tpm2-trust/tpm2-trust` - except tpm2-kira, which is
-github.com/mrwiora/tpm2-kira. A pin only resolves for
+Where they are published: github.com/tpm2-trust/<directory>, this
+workspace as `tpm2-trust/tpm2-trust`. A pin only resolves for
 others once the commit it names is on a published branch.
 
 ### How they depend on each other
@@ -134,7 +133,7 @@ flowchart LR
 |---|---|---|---|
 | tpm2-kira | aSSH as a library (`hostkey`, `server`, `persist`, `sandbox`) | submodule `assh/`, `replace` in go.mod | `./pin assh` |
 | safearch | aSSH as a command (`ca`, `agent`, `tpm sha1`, `efivar`) in the image and the initrd | submodule `assh/` | `./pin assh` |
-| tpm2-kira | its core (`github.com/mrwiora/tpm2-kira/core`) | `replace ./core`: the same repository | - |
+| tpm2-kira | its core (`github.com/tpm2-trust/tpm2-kira/core`) | `replace ./core`: the same repository | - |
 | Marify | the core's `mobile/kiracore` (and `kiratest`), with `attest/` and `transport/frame` | `core.properties` (a commit of tpm2-kira) | `./pin tpm2-kira` |
 | tpm2-kira-vault | the core's `attest/` and `vaultproto/` | submodule `tpm2-kira/`, `replace ./tpm2-kira/core` in go.mod | `./pin tpm2-kira` |
 | aSSH | go-uefi-slim's `efivar` (`persist`: its CA in an EFI variable), `uki` (PCR signatures) | submodule `assh/go-uefi-slim`, `replace ./go-uefi-slim` in go.mod (safearch's build of the command takes it nested: `assh/go-uefi-slim`) | `./pin go-uefi-slim` |
@@ -149,7 +148,7 @@ Rules of the direction:
   there, generic, with its tests; never a tpm2-kira or safearch notion.
 - **What the phone and the vault speak with tpm2-kira lives in tpm2-kira's
   core**, `tpm2-kira/core/` - a Go module of its own
-  (`github.com/mrwiora/tpm2-kira/core`: `attest/`, `transport/`,
+  (`github.com/tpm2-trust/tpm2-kira/core`: `attest/`, `transport/`,
   `vaultproto/`, `mobile/`), which requires go-tpm, x/crypto and
   tpm2-verifier (its `ekroots`) alone. The
   module boundary keeps tpm2-kira's `internal/` and aSSH out of it; the
