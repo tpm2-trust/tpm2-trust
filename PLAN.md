@@ -1,26 +1,28 @@
-# PLAN: Secure Boot's state on a SHA-1 slot
+# PLAN: Secure Boot's state after systemd's OS separator; a slot on SHA-1 is a warning
 
-Status: **steps 1-4 written 2026-11-04, uncommitted, on branch `feat/secureboot-sha1` in tpm2-kira and marify. `make test-all`, the vault's tests against the checkout and Android's unit tests pass; the commit, the pins, the emulator and the VM scenarios are open.**
+Status: **started 2026-11-04, branch `feat/secureboot-sha1` in tpm2-kira, marify and tpm2-kira-vault. Nothing pushed.**
 
 ## Goal
 
-A slot on the SHA-1 bank is a warning, not "take Secure Boot as off". A real log can hold SHA-256 digests alone (`~/eventlog`: bank `0xb` only), so a SHA-1 quote had no events to replay and the phone showed "could not be established (no event log)". The state stays proven, never assumed: "on" comes only from something the TPM signed.
+A real machine (Lenovo, SHA-1 bank alone, systemd 262) showed "Secure Boot could not be established" at an enrolment on the running system while the firmware's log says on. Cause: `systemd-pcrosseparator.service` extends PCR 7 with `os-separator` in the initrd and logs that in its own log, so the firmware's events do not replay to the register. Not SHA-1: the first guess was wrong. Fix it in the check every verifier shares, so phone, `phone verify` and the vault get it, with nothing loosened beyond that one constant.
 
 ## Steps
 
-- [x] 1. **A second quote.** When the selection is on SHA-1 the machine also quotes `sha256:7` with the same qualifying data and the same attestation key, and sends the SHA-256 digests of PCR 7's events beside it (BootContext `pcr7_chain_sha256`). Phone, `phone verify` and vault establish the state from that quote: AK signature, magic and type, qualifying data, exactly `sha256:7`, the digest reproduced, then `EstablishSecureBoot`. A second quote present and wrong is not established, with no fall back to SHA-1. No second quote (no SHA-256 bank): the SHA-1 chain, as before. A machine leaving it out only loses "on".
-- [x] 2. **SHA-1 is said.** `Verdict.sha1_bank` and the enrolment event's, from the verified selection; decides nothing, the state stays what it is.
-- [x] 3. **Wording.** No events is "no events of PCR 7 in the <bank> bank: no event log, or a log without that bank": a verifier cannot tell which, and the old text said something false.
-- [x] 4. **Marify, Android and iOS:** a SHA-1 warning card (amber, not the red of Secure Boot) on the enrolment and verdict screens, parse tests, screen tests.
-- [ ] 5. Tests: `core` (protocol, the vault's check), `make test-all`, a software TPM with both banks; then the owner commits; `./pin tpm2-kira`; the vault's tests; Marify's `android/scripts/test-emulator.sh`; VM scenarios per the test table.
+- [x] 1. `attest.EstablishSecureBoot`: the chain replays to the quoted PCR 7, or to it after exactly one `os-separator` (`OSSeparatorWord`), one direction. Two stay red. Security: the state is still read before the firmware's separator, and nothing the machine says is believed further.
+- [x] 2. The second quote goes (`SecureBootQuote`, `pcr7_chain_sha256`): it solved a problem this machine does not have. `sha1_bank`, the amber card and the wording with the bank stay.
+- [x] 3. The vault: `vaultproto.establishSecureBoot` calls the same function; tests in `core/vaultproto` and in the vault's server with a register past the separator, on both banks. Every path where the vault reads the state is listed in the report.
+- [x] 4. Clearer text for a chain that does not replay: something extended PCR 7 without logging it.
+- [x] 5. `control`: a line with what a phone and the vault will establish, from the live register and the log, beside the firmware's variable.
+- [x] 6. `control`: when it does not replay, how many events the firmware's log has for PCR 7 and whether systemd's log explains the difference. Display only, never proof.
+- [x] 7. The owner's real log as a local test: `.local/`, by environment variable, skipped elsewhere; never in a published repository.
+- [x] 8. A VM check of the state on the running system.
+- [x] 9. `control`: the SHA-1 line is orange, in the overview and the boot chain's list, and no open prerequisite (owner, 2026-11-04).
+- [ ] 10. **Versions in the app (owner, 2026-11-04), not started:** `versionName` `0.1.0+<marify commit>` (`-dirty` when changed), `BuildConfig.MARIFY_COMMIT`, `BuildConfig.CORE_COMMIT` from `app/libs/CORE_COMMIT` (what was linked, not `core.properties`), and one line `Marify 0.1.0+57ec9f2 · core c900ae2 · protocol 1 · schema N` on a screen always reached, with `KiraCore.protocolVersion()`/`schemaVersion()`; iOS the same. On the screen only, never on the Bluetooth link. No change to `core`, no pin.
+- [ ] 11. `make test-all`, `./pin tpm2-kira`, the vault's tests, Marify's emulator test, `vmtest --fast-kdf`; a package and an APK.
 
 ## What breaks
 
-Nothing for a slot on SHA-256. A SHA-1 slot needs the machine's package and the APK of this change to show "on"; enrolment is not repeated for it (the fields are optional on the wire).
-
-## Open questions
-
-- Which bank the owner's machine really used (`ls /sys/class/tpm/tpm0/ | grep pcr-`, `tpm2-kira slot info`): this plan is needed either way, but the phone's red card there is not yet proven to be this case.
+Nothing to redo: no enrolment, no slot. Machine and phone are updated together; the second quote's fields are gone from the wire.
 
 # PLAN: go-attestation where it helps
 
