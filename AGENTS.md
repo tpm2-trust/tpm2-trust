@@ -93,16 +93,15 @@ AGENTS.md applies inside it and goes into detail; this file is the map.
 | Directory | What it is | Language, module | Released as |
 |---|---|---|---|
 | `assh/` | aSSH: the SSH CA and host keys in the TPM, the privilege-separated SSH server, `persist` (NV indices, EFI variables), `sandbox` (confinement) | Go, `github.com/tpm2-trust/assh` | a library; the `assh` command (built by safearch) |
-| `tpm2-kira/` | TOTP codes, phone and vault attestation, the disk's key at boot: `tpm2-kira` (installed system) and `tpm2-kira-boot` (boot image) | Go, `github.com/mrwiora/tpm2-kira` | Arch and Debian packages (`packaging/build-packages.sh`) |
+| `tpm2-kira/` | TOTP codes, phone and vault attestation, the disk's key at boot: `tpm2-kira` (installed system) and `tpm2-kira-boot` (boot image) | Go, `github.com/tpm2-trust/tpm2-kira` | Arch and Debian packages (`packaging/build-packages.sh`) |
 | `tpm2-kira-vault/` | the vault: releases a key part to a TPM quote of an approved boot, over TLS | Go, `github.com/tpm2-trust/tpm2-kira-vault` | binary, container |
 | `marify/` | Marify, the phone app: attests a boot over Bluetooth LE, keeps the phone salt | Kotlin (Android), Swift (iOS), the Go core bound with gomobile | APKs (`build-packages.sh apk`) |
 | `safearch/` | a read-only, signed Arch image (mkosi) whose identity is aSSH's | shell, mkosi | images, releases (`build.sh`, `release.sh`) |
 | `tpm2-verifier/` | EK certificate chains of TPM vendors; the curated EK root store every project uses (`ekroots`: the vendor data embedded, checked against its signed manifest) | Go, `github.com/tpm2-trust/tpm2-verifier` | binaries, packages; a library |
-| `go-tpm/` | the go-tpm fork (`NVChangeAuth`, branch `feat/NVChangeAuth`: google/go-tpm#452), for aSSH's `tpmadmin`; dropped once upstream has it | Go | - |
+| `go-uefi-slim/` | UEFI for Go on Linux: EFI variables (`efivar`), Secure Boot's signature databases, signed updates and Authenticode, in what sbctl writes and reads, and unified kernel images (`uki`: sections, PCR 11's measurements, `.pcrsig`); the standard library and x/sys alone | Go, `github.com/tpm2-trust/go-uefi-slim` | a library |
 
-Where they are published: github.com/tpm2-trust/<directory> - this
-workspace as `tpm2-trust/tpm2-trust` - except tpm2-kira and the go-tpm
-fork, which are github.com/mrwiora/<directory>. A pin only resolves for
+Where they are published: github.com/tpm2-trust/<directory>, this
+workspace as `tpm2-trust/tpm2-trust`. A pin only resolves for
 others once the commit it names is on a published branch.
 
 ### How they depend on each other
@@ -116,7 +115,8 @@ flowchart LR
   MARIFY["marify"]
   SAFE["safearch"]
   VER["tpm2-verifier<br/>ekroots: the EK root store"]
-  GOTPM["go-tpm<br/>upstream 36f2059 everywhere; fork for tpmadmin"]
+  GOTPM["go-tpm<br/>upstream c395998 everywhere"]
+  UEFI["go-uefi-slim<br/>EFI variables, Secure Boot"]
   KIRA -->|"submodule assh/ (pin)"| ASSH
   SAFE -->|"submodule assh/ (pin), the assh command"| ASSH
   KIRA --- CORE
@@ -124,6 +124,8 @@ flowchart LR
   MARIFY -->|"core.properties (pin), gomobile"| CORE
   CORE -->|"submodule tpm2-kira/tpm2-verifier (pin)"| VER
   ASSH & KIRA & VAULT --> GOTPM
+  ASSH -->|"submodule go-uefi-slim/ (pin), persist"| UEFI
+  KIRA -->|"submodule go-uefi-slim/ (pin), its variables, Secure Boot"| UEFI
   VER --> GOTPM
 ```
 
@@ -131,11 +133,13 @@ flowchart LR
 |---|---|---|---|
 | tpm2-kira | aSSH as a library (`hostkey`, `server`, `persist`, `sandbox`) | submodule `assh/`, `replace` in go.mod | `./pin assh` |
 | safearch | aSSH as a command (`ca`, `agent`, `tpm sha1`, `efivar`) in the image and the initrd | submodule `assh/` | `./pin assh` |
-| tpm2-kira | its core (`github.com/mrwiora/tpm2-kira/core`) | `replace ./core`: the same repository | - |
+| tpm2-kira | its core (`github.com/tpm2-trust/tpm2-kira/core`) | `replace ./core`: the same repository | - |
 | Marify | the core's `mobile/kiracore` (and `kiratest`), with `attest/` and `transport/frame` | `core.properties` (a commit of tpm2-kira) | `./pin tpm2-kira` |
 | tpm2-kira-vault | the core's `attest/` and `vaultproto/` | submodule `tpm2-kira/`, `replace ./tpm2-kira/core` in go.mod | `./pin tpm2-kira` |
+| aSSH | go-uefi-slim's `efivar` (`persist`: its CA in an EFI variable), `uki` (PCR signatures) | submodule `assh/go-uefi-slim`, `replace ./go-uefi-slim` in go.mod (safearch's build of the command takes it nested: `assh/go-uefi-slim`) | `./pin go-uefi-slim` |
+| tpm2-kira | go-uefi-slim (its own EFI variables, Secure Boot, `uki`) | submodule `tpm2-kira/go-uefi-slim`, `replace ./go-uefi-slim` in go.mod (aSSH's replace does not reach it) | `./pin go-uefi-slim` |
 | tpm2-kira's core (and so the phone and the vault) | tpm2-verifier's `ekroots` | submodule `tpm2-kira/tpm2-verifier`, `replace ../tpm2-verifier` in `core/go.mod` (and `./tpm2-verifier` in tpm2-kira's, `./tpm2-kira/tpm2-verifier` in the vault's) | `./pin tpm2-verifier` |
-| every Go module (aSSH, tpm2-kira, its core, the vault, tpm2-verifier) | go-tpm | one pseudo-version in each go.mod, the same everywhere: they end up in one binary (aSSH's `replace` to the fork reaches `tpmadmin` alone); `./pin status` warns when they differ | by hand, in every module at once |
+| every Go module (aSSH, tpm2-kira, its core, the vault, tpm2-verifier) | go-tpm | one pseudo-version in each go.mod, the same everywhere: they end up in one binary; no `replace` of it anywhere; `./pin status` warns when they differ | by hand, in every module at once |
 
 Rules of the direction:
 
@@ -144,7 +148,7 @@ Rules of the direction:
   there, generic, with its tests; never a tpm2-kira or safearch notion.
 - **What the phone and the vault speak with tpm2-kira lives in tpm2-kira's
   core**, `tpm2-kira/core/` - a Go module of its own
-  (`github.com/mrwiora/tpm2-kira/core`: `attest/`, `transport/`,
+  (`github.com/tpm2-trust/tpm2-kira/core`: `attest/`, `transport/`,
   `vaultproto/`, `mobile/`), which requires go-tpm, x/crypto and
   tpm2-verifier (its `ekroots`) alone. The
   module boundary keeps tpm2-kira's `internal/` and aSSH out of it; the
@@ -156,9 +160,40 @@ Rules of the direction:
   manifest), never as a copy elsewhere. A TPM of a vendor not in the store
   is "vendor not known" - a risk to weigh, not untrusted - everywhere it is
   shown.
+- **EFI variables go through the workspace's `go-uefi-slim` module**, which neither aSSH nor
+  tpm2-kira owns (the standard library and x/sys alone).
+  - aSSH's `persist` uses it for aSSH's variables (its CA file, `efi:NAME`).
+  - tpm2-kira uses it directly, not through aSSH, for its own variables (the
+    machine-id, the slots' records) and for Secure Boot's (PK, KEK, db, dbx).
+  - safearch's scripts use the `assh efivar` command.
+  - What both need about UEFI goes into `go-uefi-slim`, generic, with its tests; never a copy in
+    a project, never aSSH's.
+  - NV indices stay with aSSH's `persist`.
 - **A new dependency between projects** gets a row in the tables above,
   a pin that `./pin status` shows (extend `pin`), and release builds that
   build the pin (`GOWORK=off`), not the checkout.
+
+### Key algorithms
+
+When a key type is ours to choose:
+
+- **Ed25519 wherever every party that uses the key supports it** (SSH user keys, for
+  example).
+- **Otherwise RSA, at the greatest length every one of those parties accepts, rather
+  than ECDSA.**
+  - A TPM, UEFI Secure Boot and a PIV token often have no Ed25519.
+  - "Accepts" is decided from the device where it can be asked (a TPM: `TPM2_TestParms`).
+    swtpm 0.10 takes RSA up to 3072; many hardware TPMs only take 2048.
+  - A key the TPM has to verify can be no longer than the TPM takes.
+- **ECDSA only where RSA is not possible.**
+
+### Old machines
+
+No project keeps an existing installation working across a change: a
+machine is set up again (a CA made again, a phone enrolled again, an image
+rebuilt), never migrated - in every project, not only where its own
+AGENTS.md says so. What still has to be said, every time and before the
+change: which former functionality breaks, and what the owner has to redo.
 
 ### Working across projects
 
@@ -184,20 +219,42 @@ Rules of the direction:
   others use.** It shows every pin against the checkout it pins: the aSSH
   submodules, Marify's `core.properties` (the tpm2-kira commit the app
   links) and the vault's submodule `tpm2-kira/` (both moved by `./pin
-  tpm2-kira`), and go-tpm, which tpm2-kira and aSSH pin by intent and `pin`
-  shows without moving.
+  tpm2-kira`), go-tpm, which tpm2-kira and aSSH pin by intent and `pin`
+  shows without moving, and the AUR recipe's commits of tpm2-kira's submodules
+  (`packaging/aur/PKGBUILD`, which GitHub's tarballs need), shown against its
+  pins and set with its `_tag` at a release.
 - **Pinning is staging.** `pin` never commits; the commit of a new pin is
   the consuming project's, with its tests run against it.
 
 ### What to test after a change
 
+Test by what changed, and no more; the full proof belongs to the end of a batch.
+
 | Changed | Run |
 |---|---|
-| `assh/` | its tests (`go test ./...`, swtpm); tpm2-kira's suite against it (`go.work`); safearch's `tests/run.sh` after `./pin assh` |
-| tpm2-kira's `internal/`, the boot integration | `make test-all` (unit and integration, swtpm); `tools/vmtest.py --target both` on fresh VMs |
-| `tpm2-kira/core/` | the above (`make test-unit` runs the core's tests in `core/`), the vault's tests, Marify's `android/scripts/test-emulator.sh` (JVM, emulator and swtpm tests) after `./pin tpm2-kira` |
-| `tpm2-kira-vault/` | its tests; `tools/vmtest.py` (the vault steps) |
-| `safearch/` | `tests/run.sh` (and `tests/vm.sh` for a boot) |
+| Docs only | nothing |
+| Test tools | the affected scenario alone (`vmtest.py --only SCENARIO`) |
+| Installed-system code of tpm2-kira (`control`, `status`, the admin commands) | `make test-all` |
+| tpm2-kira's boot, close or unlock | `make test-all`; `tools/vmtest.py --fast-kdf`; the affected scenarios, from a saved setup |
+| Argon2id, or what memory the boot takes | as above, at the real cost (without `--fast-kdf`), on the affected boots |
+| `tpm2-kira/core/` | as for the boot; the vault's tests. Marify's `android/scripts/test-emulator.sh` at the end of the batch, after `./pin tpm2-kira` |
+| `assh/` | its tests (`go test ./...`, swtpm); tpm2-kira's `make test-all` against it (`go.work`); safearch's `tests/run.sh` after `./pin assh` |
+| `tpm2-kira-vault/` | its tests; the vault steps of `tools/vmtest.py` at the end of the batch |
+| `go-uefi-slim/` | its tests (the immutable test as root on a VM); aSSH's and tpm2-kira's suites after `./pin go-uefi-slim` |
+| `tpm2-verifier/` | its tests; `core`'s and the vault's after `./pin tpm2-verifier` |
+| `safearch/` | `tests/run.sh`; `tests/vm.sh` at the end of the batch, when the boot changed |
+
+`tools/test-affected.py` (tpm2-kira; `--since TIME` for a batch) prints what this table asks for the changes against a base, and starts nothing; a test keeps its table and this one in step.
+
+The depths of testing, what runs at each and what none of them covers: `tpm2-kira/docs/TESTING.md`, "Test depths".
+
+**The proof, once per batch, before the owner pushes:** `tools/proof.py --since <the batch's start>`, one command, from `fresh`, without `--fast-kdf`: both machines in parallel through the scenarios that have a budget, beside them `make test-all` with nothing `(cached)`, aSSH's tests, the vault's and safearch's `tests/run.sh`. **15-20 minutes wall clock are an orientation, not a limit:** time fails nothing, budgets are information, and a run over 20 minutes says so in its report with what went over. Only a run that hangs is stopped, after an hour, and reported as stuck. The parts without a VM start when the machines' setups are done. Parts the table names on top run after it. A run with `--fast-kdf`, from a saved setup or with `--only` is never the proof; a report says which it was.
+
+**`tools/proof.py --all`, before a release, the owner's call:** every scenario the proof left out, by name, `tests/vm.sh` and Marify.
+
+**No full run while a scenario fails.** Each is proven alone from a saved setup first (`vmtest.py --only SCENARIO`), then one proof; if it fails, that scenario alone again. **A run expected over 10 minutes is announced first.**
+
+**A run of yours:** iterate from a saved setup (`--save-setup`, `--only`; `tpm2-kira/docs/TESTING.md`). A wait for a run ends on the run's failure too, not only on the line it hopes for. Stage what you changed by name: a shared checkout may hold another agent's work.
 
 The VM test and the emulator test run without anyone at the keyboard from
 a defined state (tpm2-kira `docs/TESTING.md`, Marify `android/TESTING.md`);
