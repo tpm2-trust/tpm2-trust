@@ -16,7 +16,7 @@
 #                       to tpm2-verifier's HEAD
 #   ./pin go-uefi-slim  assh/go-uefi-slim and tpm2-kira/go-uefi-slim (EFI
 #                       variables, Secure Boot) to go-uefi-slim's HEAD
-#   ./pin go-tui-slim   tpm2-kira/go-tui-slim and tpm2-kira-vault/go-tui-slim
+#   ./pin go-tui-slim   assh/go-tui-slim, tpm2-kira/go-tui-slim and tpm2-kira-vault/go-tui-slim
 #                       (the full screen, questions, secrets) to go-tui-slim's HEAD
 #
 # go-tpm is required in every Go module's go.mod: shown, compared - one
@@ -35,6 +35,7 @@ SUBMODULES=(
     "tpm2-kira tpm2-verifier tpm2-verifier"
     "assh go-uefi-slim go-uefi-slim"
     "tpm2-kira go-uefi-slim go-uefi-slim"
+    "assh go-tui-slim go-tui-slim"
     "tpm2-kira go-tui-slim go-tui-slim"
     "tpm2-kira-vault go-tui-slim go-tui-slim"
 )
