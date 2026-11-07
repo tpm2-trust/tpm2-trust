@@ -1,3 +1,193 @@
+# PLAN: `tpm2-kira control` as one full-screen terminal UI, every option in one place
+
+Status: **done 2026-11-07** ("implement all recommended things": the seven questions as recommended);
+the proof passed. Branch `feat/control-tui` in tpm2-kira, from `feat/boot-net-console`.
+
+## Goal
+
+`control` is one structured screen with every setting and every command of tpm2-kira in it: sections
+in a sidebar, the items of a section with their state, a detail pane saying what an item does, why it
+is blocked and the command it equals. No new dependency (the standard library and x/sys, as now). The
+facts layer and the admin functions stay; what changes is the model between them and the drawing.
+
+## Decisions (2026-11-07)
+
+1. **Full screen:** the alternate screen while control runs, the terminal as it was afterwards (on
+   every way out: q, Ctrl-C, a signal, a panic). The Linux console ignores the alternate screen: it is
+   cleared and redrawn instead.
+2. **Every option:** every setting of control.conf and assh.conf and every command of the installed
+   system, a person would use; script-only flags (`--pin-fd`, `--json`, `--buildroot`, ...) and the
+   boot binary's commands in Reference only.
+3. **Destroy:** a typed confirmation (the slot number, or `delete`) for what removes slots, keyslots,
+   phones, the SSH CA; y/N for the rest.
+4. **Glyphs:** detected - Unicode (box drawing, ✓ ⚠) on a UTF-8 locale, ASCII otherwise; 8 colours;
+   `NO_COLOR` honoured.
+5. **`control --lines`:** the numbered line menus, forced; chosen on its own without a terminal size,
+   on `TERM=dumb`, with `--debug`, and without a terminal (then the report, as now).
+6. **Facts in the background:** the frame comes up at once and fills in; the slow parts (the vault's
+   check, the empty passphrase test) say "checking ..." until they are done; `r` collects again.
+7. **Package:** `internal/tui`, generic (knows nothing of tpm2-kira): terminal modes, keys, text cells,
+   frames and their diff. `internal/admin` keeps control (the facts are unexported there) and fills the
+   model; `internal/prompt` uses `tui` for its text and terminal handling. `tui` goes on
+   boot_binary_test's forbidden list.
+
+## Steps
+
+- [x] 1. `internal/tui`: text (cells, layout, sanitize), term (raw mode, size, SIGWINCH, the alternate
+      screen, cursor, restore on every way out), keys (a CSI decoder: arrows, PgUp/PgDn, Home/End, the
+      Linux console's sequences), frame (rows, panes, the diff of what changed); prompt imports it.
+      Unit tests for each.
+- [x] 2. The model: `Section`, `Item` (state Good/Open/Blocked/Dirty/Info, danger View/Change/Destroy,
+      the equivalent command, what a destroy removes), built from the facts, pure; `controlStep` goes.
+      An `asker` interface and `controlOps` (function fields, the real ones by default) so actions are
+      tested with fakes. Golden tests of the model.
+- [x] 3. Line mode on the model (`--lines`, and the automatic cases): sections, then items; the
+      report without a terminal; vmtest's control sessions follow the new labels.
+- [x] 4. The items that are missing (help.go's commands): seal slot N with its PCRs, approve now,
+      phone enrol options, phone unenrol, phone salt rotate and unenrol, luks enrol options, mark,
+      derive, delete everything, the read-only views (status, slot list/info, luks/vault status,
+      yubikey list, initramfs plan, pcrtips) and Reference (the help pages, handed in from main).
+- [x] 5. Destroy: the danger marking, "Destroys:" in the detail, the typed confirmation.
+- [x] 6. Full screen: the frame (header, sidebar, items, detail, status row), keys, resize, search
+      (`/`), help (`?`), refresh (`r`); actions in the cooked terminal through prompt, then back;
+      background facts. Golden frames at 80x25, 40x24, 132x43; a pty harness (keys in, modes restored).
+- [x] 7. Docs (CONTROL.md, the help page) describe the current design only; vmtest's `control_keys`
+      drives the full screen (a resize mid-session, the terminal restored).
+- [x] 8. `make test-all`, the affected vmtest scenarios, then the proof (`.local/runs/proof-tui`: ALL PASS, with marify and phone-vm).
+
+Done as: `controlStep` carries the model (Danger, Destroys, Command; `annotate` fills the command
+by key) rather than a new type; the line menus keep the boot chain and the Overview with a line per
+section (Tools and Reference added); the views and the help pages run tpm2-kira itself, so what
+control shows is the command's own output. Left to the help pages, by hand: luks mark and derive,
+phone salt rotate, phone quote/verify/gate (they write key files for cryptsetup, or are the boot's).
+
+## What breaks (said before the change)
+
+Nothing that is enrolled. `control`'s screens, labels and menu numbers change: whoever drives it by
+script (vmtest does) follows the new labels or uses `--lines`. Destroying now asks for a typed answer.
+
+## Open questions
+
+None open; the risks the evaluation named (stray output under the frame, secrets_test's reach through
+function fields) are checked in steps 2 and 6.
+
+# PLAN: the boot's network said plainly, the neighbours told, the console the same screen as SSH
+
+Status: **done 2026-11-07** (1a, codes always on the console, branch `feat/boot-net-console` from `chore/review-fixes`); the proof passed.
+
+## Goal
+
+Three faults of the boot image when it has a network:
+
+1. Nobody can see that the boot waits for an address. Today only the SSH hint says
+   "waiting for a network address", once, and nothing is said at all for the vault alone.
+2. A machine that gets the same address again can stay unreachable, because the switch, the
+   gateway or the other hosts still hold an old ARP entry. Once an address is up, the boot should
+   tell its neighbours: on by default, and switchable off in control.conf.
+3. With SSH on, the console shows only where to log in. It should show the same code screen as
+   the SSH session: the TOTP codes, the phone's line, and the prompt for the password, the salt
+   or the keyboard pepper.
+
+## Steps
+
+- [x] 1. **The network's state, one source** (`internal/netstate`, new; the standard library and
+      x/sys): for the interfaces the image's network is for (`TPM2_KIRA_NET_MATCH`, else every
+      wired one), it reports one of:
+      - no interface yet
+      - no link ("is the cable in?")
+      - waiting for an address (DHCP), with the seconds so far
+      - the addresses
+      - static: set, or not yet
+      run learns the mode and the match from a small image file that the boot plan writes beside
+      the net part (`/etc/tpm2-kira/net.conf`: mode, match, announce). Its settings are already in
+      the net part's digest, so `control`'s check of the image is unchanged.
+- [x] 2. **Said where the person looks.**
+      - The code screen gets a network line, on the console and in the SSH session: yellow while
+        waiting, red for no link, green with the addresses.
+      - Without a code screen (the vault alone, `holdForParts`), the line is printed on each change.
+      - The SSH hint takes its addresses from the same source, and drops its own "waiting ..."
+        sentence.
+      - Every change also goes into the boot's log.
+- [x] 3. **The neighbours told** (`TPM2_KIRA_NET_ANNOUNCE=on|off`, default `on`; parsed, written
+      and suggested by `control` like the other `TPM2_KIRA_NET_*` keys; it goes into the plan's
+      net digest):
+      - When an IPv4 address comes up (and again if it changes), run sends 3 gratuitous ARPs at
+        1 s intervals, as a request and as a reply, through an AF_PACKET socket on that interface.
+      - It sends one ICMP echo to each gateway (v4 and v6), so that the gateway learns the MAC.
+      - For IPv6, one unsolicited neighbour advertisement.
+      - Send only: no reply is read, so run parses no outside input and needs no further
+        confinement.
+      - Logged as "network: announced 192.0.2.10 on enp1s0".
+      - Arch (networkd) and Debian (ipconfig/udhcpc) behave the same, because run does it in Go
+        for both.
+- [x] 4. **The console shows what the SSH session shows.**
+      - With SSH on, `showScreen` renders the screen once and writes it to the sessions and to the
+        console: codes, the phone's line and the network line. Below it on the console comes the
+        SSH hint (where to log in, the host key, the sessions).
+      - Who confirms first gets the prompt.
+      - The prompt itself: see open question 1.
+- [x] 5. Tests (proof `.local/runs/proof-netconsole`: ALL PASS, with phone-vm; screens in `.local/screens/proof-netconsole/screens.html`):
+      - `netstate` against fixed `/sys` and netlink fixtures.
+      - The ARP, NA and ICMP frames against fixed bytes.
+      - control.conf's `TPM2_KIRA_NET_ANNOUNCE` (parse, write, suggestion, digest).
+      - `showScreen` with SSH on: the console holds the codes.
+      - vmtest: the SSH scenario checks the network line and the codes on the console (serial
+        log) and the "announced" line in the boot's log, on Arch and Debian. Whether the
+        neighbours really update can't be seen there: the VMs run on user-mode networking, which
+        has no ARP of its own.
+      - `make test-all` and the affected vmtest scenarios from a saved setup.
+- [x] 6. Docs: SSH.md (the console screen, the network line), control.conf's template,
+      CONTROL.md, TESTING.md.
+
+## What breaks
+
+Nothing that is enrolled. An image built before the change lacks `net.conf`, so it shows no network
+line and announces nothing. A rebuild fixes that, and `control` already asks for one, because the
+net part's digest changes with the new key.
+
+## Open questions
+
+1. **The prompt with SSH on** (step 4). After a confirmation:
+   - (a) The prompt goes to where the confirmation came from. The other side shows where it is
+     asked. Enter at the console still stops the SSH server, as today. *Recommended: the smallest
+     change, and one place to type.*
+   - (b) The prompt opens at the console and in the confirming session at once, and the first
+     answer wins (the other is cancelled). The SSH server keeps running until the boot goes on.
+2. **Codes on the console with SSH on.** A machine in a rack has a console others may see (KVM,
+   IPMI). A TOTP code is no secret: it proves the boot to the one who compares it. But the
+   console then shows it to anyone who looks there too. Always shown, or does it need a switch?
+   *Recommended: always shown, as it is without SSH.*
+3. The base branch: `dev`, or on top of the unpushed `chore/review-fixes`? *Recommended: a new
+   `feat/boot-net-console` from `chore/review-fixes`, because it touches the same tests.*
+
+# PLAN: the review's points - pinned derivations, the spec, exit status, small things, structure
+
+Status: **confirmed 2026-11-07 ("write a plan for all points, start implementing; after the restructuring the full test suite"), in progress. Branch `chore/review-fixes` in tpm2-kira and the workspace.**
+
+## Goal
+
+What the review of 2026-11-07 found, all of it: every derivation that decides a disk's key or must agree between phone, vault and machine pinned to fixed bytes; the documented phone-salt derivation corrected to the code's; a real exit status for the installed system's commands; the keyboard's small things; `internal/admin`, its tests and `vmtest.py` cut into parts that can be read. Then the full test suite.
+
+## Steps
+
+- [x] 1. Known answers, a test each against fixed bytes: `phonegate.FactorSalt`; `vaultkey.Salt`, `Password`, `Key`, `PepperCheck`; `diskkey.KeyboardSalt`; `attest.KeyboardLayoutOf`. AGENTS.md (tpm2-kira): a known answer changes only with a "what breaks" and the owner's word.
+- [x] 2. The spec: PLAN-PHONESALT.md §3 and DISK-KEY.md say FactorSalt's derivation as the code has it (`u16be(len(label)) ‖ label`); the normative derivations of the disk's key in one place, DISK-KEY.md "The derivations", the plans pointing there.
+- [x] 3. Exit status: `fail` of tpm2-kira exits 1; what must never break the boot chain says so where it calls (the initramfs hooks, the kernel's postinst, pacman's hook: `|| true` with the message kept). tpm2-kira-boot unchanged (0, the boot). Tests and vmtest.py to the status.
+- [x] 4. Small things: the keyboard's layout copies wiped when done (phone and vault sessions, after the pepper is made); a new derivation's length prefix noted as `u32le` (the core's `lp`), the two old ones named in DISK-KEY.md.
+- [x] 5. Structure, no behaviour changed: `control.go`, `attest.go` and `cmd_test.go` cut into files by topic; a domain of `internal/admin` that needs nothing else of it into a package of its own where the dependencies allow (checked file by file); `vmtest.py`'s helpers (Session, Vault, Phone) into a module beside it.
+## Results of 1-5
+
+- 1-2: every row of DISK-KEY.md "The derivations" checked against an implementation of its text alone, and pinned. Found: PLAN-PHONESALT.md said `lp(label)` (u32le); the code has always used u16be; the docs follow the code.
+- 3: the hooks already went on by their own status (`|| rc=$?`, `ExecStartPost=-`); `TestExitCodes` now holds status and words together.
+- 4: also found that `vaultkey.Keys` never wiped what the vault released; `Forget` does, at `run`'s end.
+- 5: `control.go`, `attest.go`, `cmd_test.go` cut by topic (the same 798 declarations), `tools/vmtestlib.py`. A package per domain of `internal/admin`: only small files compile without the rest; the domains share the slot blob's I/O, the signing key and the prompts. Not split; a shared layer first, the owner's call.
+
+- [ ] 6. The full suite: `tools/proof.py --all` (about 45 min plus phone-vm, announced), and the vault's, after `./pin tpm2-kira` where the core changed.
+
+## What breaks
+
+Step 3: a failed `tpm2-kira` command exits 1, not 0. A script that relied on 0 (none in the workspace once the hooks say `|| true`) sees the failure. Nothing else: no key, no recipe, no protocol changes; the known answers pin what is.
+
 # PLAN: dead code out of tpm2-kira
 
 Status: **confirmed 2026-11-07, done 2026-11-07; nothing pushed. Branch `chore/deadcode` in tpm2-kira and the workspace.**
