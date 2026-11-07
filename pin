@@ -14,7 +14,7 @@
 #                       kira/ (its core) to kira's HEAD
 #   ./pin tpm2-verifier kira/tpm2-verifier (the core's EK root store)
 #                       to tpm2-verifier's HEAD
-#   ./pin go-uefi-slim  assh/go-uefi-slim and kira/go-uefi-slim (EFI
+#   ./pin go-uefi-slim  assh/go-uefi-slim, kira/go-uefi-slim and kira-vault/go-uefi-slim (EFI
 #                       variables, Secure Boot) to go-uefi-slim's HEAD
 #   ./pin go-tui-slim   assh/go-tui-slim, kira/go-tui-slim and kira-vault/go-tui-slim
 #                       (the full screen, questions, secrets) to go-tui-slim's HEAD
@@ -38,6 +38,7 @@ SUBMODULES=(
     "assh go-tui-slim go-tui-slim"
     "kira go-tui-slim go-tui-slim"
     "kira-vault go-tui-slim go-tui-slim"
+    "kira-vault go-uefi-slim go-uefi-slim"
 )
 
 red() { printf '\033[31m%s\033[0m' "$*"; }

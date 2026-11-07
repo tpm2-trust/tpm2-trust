@@ -131,6 +131,7 @@ flowchart LR
   KIRA -->|"submodule go-tui-slim/ (pin), control, prompts, secrets"| TUI
   ASSH -->|"submodule go-tui-slim/ (pin), the process lock"| TUI
   VAULT -->|"submodule go-tui-slim/ (pin), its control, secrets"| TUI
+  VAULT -->|"submodule go-uefi-slim/ (pin), its host's Secure Boot"| UEFI
   VER --> GOTPM
 ```
 
@@ -146,6 +147,7 @@ flowchart LR
 | aSSH | go-tui-slim's `secret` (the process locked in memory, not dumpable, before a PIN is read) | submodule `assh/go-tui-slim`, `replace ./go-tui-slim` in go.mod (safearch's build of the command takes it nested: `assh/go-tui-slim`) | `./pin go-tui-slim` |
 | kira | go-tui-slim (`control`'s full screen: `panel`; the prompts, the secrets' buffers) | submodule `kira/go-tui-slim`, `replace ./go-tui-slim` in go.mod | `./pin go-tui-slim` |
 | kira-vault | go-tui-slim (its `control`, prompts, secrets) | submodule `kira-vault/go-tui-slim`, `replace ./go-tui-slim` in go.mod - its own, not nested through `kira/`, so the vault's screen does not move with the core's pin | `./pin go-tui-slim` |
+| kira-vault | go-uefi-slim (its host's Secure Boot, from the EFI variables) | submodule `kira-vault/go-uefi-slim`, `replace ./go-uefi-slim` in go.mod - its own, as its go-tui-slim | `./pin go-uefi-slim` |
 | kira's core (and so the phone and the vault) | tpm2-verifier's `ekroots` | submodule `kira/tpm2-verifier`, `replace ../tpm2-verifier` in `core/go.mod` (and `./tpm2-verifier` in kira's, `./kira/tpm2-verifier` in the vault's) | `./pin tpm2-verifier` |
 | every Go module (aSSH, kira, its core, the vault, tpm2-verifier) | go-tpm | one pseudo-version in each go.mod, the same everywhere: they end up in one binary; no `replace` of it anywhere; `./pin status` warns when they differ | by hand, in every module at once |
 
