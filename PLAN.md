@@ -1,3 +1,28 @@
+# PLAN: dead code out of tpm2-kira
+
+Status: **confirmed 2026-11-07, done 2026-11-07; nothing pushed. Branch `chore/deadcode` in tpm2-kira and the workspace.**
+
+## Goal
+
+What `deadcode` (golang.org/x/tools) finds unreachable from every consumer - tpm2-kira's two binaries, the vault's, the phone binding (`kiracore`, `kiratest`) - goes; what only tests use moves into the tests. No behaviour changes. Runs: `.local/runs/deadcode*.txt` (2026-11-07).
+
+## Steps
+
+- [x] 1. No caller at all: `tpm2-kira-boot`'s `fail`, `BootPlan.drop`, `status.quoted` go.
+- [x] 2. Only tests: `signing.LoadSigningPrivateKey` (production uses `LoadCheckedSigningPrivateKey`) a test helper; `diskkey.ParseRecipe` and `RecipeOfTokens`, `admin.LoadAttestConfig`, `admin.IsTPMAuthError`, `measure.UKIMeasurementDigests`, `tpmdev.HandleNVRAMNotFoundError` go with what tests only they had, or move into the tests that need them.
+- [x] 3. The core: `attest.FactorFromSecret`, `PhoneRootNames` go with their tests' lines; `PolicyAuthorizeDigest` into the golden test's file.
+- [x] 4. `deadcode` again: nothing left of these.
+- [x] 5. Tests: `make test-all` PASS (985), the core's and the vault's PASS.
+
+## Results
+
+- Kept: `measure.UKIMeasurementDigests` (the swtpm test that boots a UKI needs PCR 11's extends, which only `measure` computes); `Verifier.RequestEventlog`, `Verifier.Eventlog`, `EventlogRequest.Encode` (the app calls them through `kiracore`; the binding's own tests do not).
+- Found: `attest.FactorFromSecret` was not `phonegate.FactorSalt`'s derivation (label length 4 bytes little-endian against 2 big-endian): removed, `FactorSalt` unchanged, so every enrolled phone salt keeps its key.
+
+## What breaks
+
+Nothing: no command, no output, no protocol changes.
+
 # PLAN: `reveal` goes; `slot add` shows the first code
 
 Status: **confirmed 2026-11-07, done 2026-11-07; nothing pushed. Branch `chore/reveal-cleanup` in tpm2-kira and the workspace.**
