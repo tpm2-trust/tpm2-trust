@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # pin: the pins between the projects of this workspace.
 #
-# Each project is edited in its checkout here (assh/, tpm2-kira/, ...). A
+# Each project is edited in its checkout here (assh/, kira/, ...). A
 # project that uses another pins a commit of it - a submodule, or a line in
 # a file - and builds its releases from exactly that commit; go.work lets
 # development builds use the checkouts instead. This script shows where the
@@ -9,19 +9,19 @@
 # the project's own step.
 #
 #   ./pin status        every pin, against the checkout it pins
-#   ./pin assh          tpm2-kira/assh and safearch/assh to assh's HEAD
-#   ./pin tpm2-kira     marify's core.properties and the vault's submodule
-#                       tpm2-kira/ (its core) to tpm2-kira's HEAD
-#   ./pin tpm2-verifier tpm2-kira/tpm2-verifier (the core's EK root store)
+#   ./pin assh          kira/assh and safearch/assh to assh's HEAD
+#   ./pin kira          marify's core.properties and the vault's submodule
+#                       kira/ (its core) to kira's HEAD
+#   ./pin tpm2-verifier kira/tpm2-verifier (the core's EK root store)
 #                       to tpm2-verifier's HEAD
-#   ./pin go-uefi-slim  assh/go-uefi-slim and tpm2-kira/go-uefi-slim (EFI
+#   ./pin go-uefi-slim  assh/go-uefi-slim and kira/go-uefi-slim (EFI
 #                       variables, Secure Boot) to go-uefi-slim's HEAD
-#   ./pin go-tui-slim   assh/go-tui-slim, tpm2-kira/go-tui-slim and tpm2-kira-vault/go-tui-slim
+#   ./pin go-tui-slim   assh/go-tui-slim, kira/go-tui-slim and kira-vault/go-tui-slim
 #                       (the full screen, questions, secrets) to go-tui-slim's HEAD
 #
 # go-tpm is required in every Go module's go.mod: shown, compared - one
 # version for all - and moved by hand. So are the AUR recipe's commits of
-# tpm2-kira's submodules, shown against its pins, set with its _tag at a release.
+# kira's submodules, shown against its pins, set with its _tag at a release.
 
 set -euo pipefail
 
@@ -29,15 +29,15 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # The submodules that pin a checkout of this workspace: "consumer path checkout".
 SUBMODULES=(
-    "tpm2-kira assh assh"
+    "kira assh assh"
     "safearch assh assh"
-    "tpm2-kira-vault tpm2-kira tpm2-kira"
-    "tpm2-kira tpm2-verifier tpm2-verifier"
+    "kira-vault kira kira"
+    "kira tpm2-verifier tpm2-verifier"
     "assh go-uefi-slim go-uefi-slim"
-    "tpm2-kira go-uefi-slim go-uefi-slim"
+    "kira go-uefi-slim go-uefi-slim"
     "assh go-tui-slim go-tui-slim"
-    "tpm2-kira go-tui-slim go-tui-slim"
-    "tpm2-kira-vault go-tui-slim go-tui-slim"
+    "kira go-tui-slim go-tui-slim"
+    "kira-vault go-tui-slim go-tui-slim"
 )
 
 red() { printf '\033[31m%s\033[0m' "$*"; }
@@ -68,27 +68,27 @@ where() {
 
 # GOTPM_MODULES are the Go modules here that require go-tpm: one version
 # for all, since the core, aSSH and tpm2-verifier end up in one binary.
-GOTPM_MODULES=(assh tpm2-kira tpm2-kira/core tpm2-kira-vault tpm2-verifier)
+GOTPM_MODULES=(assh kira kira/core kira-vault tpm2-verifier)
 
 # The AUR recipe builds from GitHub's tarballs, which leave submodules out, so
 # it names each submodule's commit itself: "variable path".
-AUR_PKGBUILD=tpm2-kira/packaging/aur/PKGBUILD
+AUR_PKGBUILD=kira/packaging/aur/PKGBUILD
 AUR_PINS=("_assh assh" "_verifier tpm2-verifier" "_uefislim go-uefi-slim" "_tuislim go-tui-slim")
 
-# aur_status shows the recipe's commits against the submodules tpm2-kira's HEAD
+# aur_status shows the recipe's commits against the submodules kira's HEAD
 # records. Nothing moves them: they are set with the recipe's _tag, at a release.
 aur_status() {
     local line var path want have
     for line in "${AUR_PINS[@]}"; do
         read -r var path <<<"$line"
         have="$(sed -n "s/^$var=//p" "$ROOT/$AUR_PKGBUILD" | head -1)"
-        want="$(git -C "$ROOT/tpm2-kira" ls-tree HEAD "$path" | awk '{print $3}')"
+        want="$(git -C "$ROOT/kira" ls-tree HEAD "$path" | awk '{print $3}')"
         if [[ -z $have ]]; then
             printf '%-26s %s\n' "aur $var" "$(red "not in $AUR_PKGBUILD")"
         elif [[ $have == "$want" ]]; then
-            printf '%-26s %s  %s\n' "aur $var" "${have:0:7}" "$(green "at tpm2-kira's pin")"
+            printf '%-26s %s  %s\n' "aur $var" "${have:0:7}" "$(green "at kira's pin")"
         else
-            printf '%-26s %s  %s\n' "aur $var" "${have:0:7}" "$(red "not tpm2-kira's pin ${want:0:7}: set it with _tag, at a release")"
+            printf '%-26s %s  %s\n' "aur $var" "${have:0:7}" "$(red "not kira's pin ${want:0:7}: set it with _tag, at a release")"
         fi
     done
 }
@@ -129,18 +129,18 @@ status() {
     done
     local kira
     kira="$(sed -n 's/^kira.commit=//p' "$ROOT/marify/core.properties")"
-    printf '%-26s %s  %s\n' "marify core.properties" "${kira:0:7}" "$(where "$ROOT/tpm2-kira" "$kira")"
+    printf '%-26s %s  %s\n' "marify core.properties" "${kira:0:7}" "$(where "$ROOT/kira" "$kira")"
     aur_status
     gotpm_status
     local repo
-    for repo in assh tpm2-kira go-uefi-slim; do
+    for repo in assh kira go-uefi-slim; do
         dirty "$ROOT/$repo" && echo "$(red "$repo/ has uncommitted changes: a pin takes its HEAD, not them")"
     done
     return 0
 }
 
-# nested DIR: the submodules of the pinned checkout in DIR (tpm2-kira's
-# assh/ and tpm2-verifier/ inside the vault's tpm2-kira/), at the commits
+# nested DIR: the submodules of the pinned checkout in DIR (kira's
+# assh/ and tpm2-verifier/ inside the vault's kira/), at the commits
 # it records, from the workspace's checkouts of the same name - their
 # remotes may not have those commits yet.
 nested() {
@@ -166,6 +166,10 @@ pin_submodules() {
     for line in "${SUBMODULES[@]}"; do
         read -r consumer path checkout <<<"$line"
         [[ $checkout == "$co" ]] || continue
+        if [[ -z $(git -C "$ROOT/$consumer" ls-files -s -- "$path" 2>/dev/null) ]]; then
+            echo "$consumer: no submodule $path yet, nothing to move"
+            continue
+        fi
         dirty "$ROOT/$consumer/$path" && die "$consumer/$path has changes of its own: move them to $co/ first"
         git -C "$ROOT/$consumer/$path" fetch -q --no-recurse-submodules "$ROOT/$checkout" "+refs/heads/*:refs/remotes/workspace/*"
         git -C "$ROOT/$consumer/$path" checkout -q --detach "$sha"
@@ -176,13 +180,13 @@ pin_submodules() {
 }
 
 pin_kira() {
-    dirty "$ROOT/tpm2-kira" && die "tpm2-kira/ has uncommitted changes: commit them first"
-    pin_submodules tpm2-kira
+    dirty "$ROOT/kira" && die "kira/ has uncommitted changes: commit them first"
+    pin_submodules kira
     local sha
-    sha="$(git -C "$ROOT/tpm2-kira" rev-parse HEAD)"
+    sha="$(git -C "$ROOT/kira" rev-parse HEAD)"
     sed -i "s/^kira.commit=.*/kira.commit=$sha/" "$ROOT/marify/core.properties"
     git -C "$ROOT/marify" add core.properties
-    echo "marify: core.properties at tpm2-kira $(short "$ROOT/tpm2-kira" "$sha"), staged - commit it in marify"
+    echo "marify: core.properties at kira $(short "$ROOT/kira" "$sha"), staged - commit it in marify"
 }
 
 case "${1:-status}" in
@@ -191,6 +195,6 @@ assh) pin_submodules assh ;;
 tpm2-verifier) pin_submodules tpm2-verifier ;;
 go-uefi-slim) pin_submodules go-uefi-slim ;;
 go-tui-slim) pin_submodules go-tui-slim ;;
-tpm2-kira) pin_kira ;;
-*) die "usage: pin [status | assh | tpm2-kira | tpm2-verifier | go-uefi-slim | go-tui-slim]" ;;
+kira) pin_kira ;;
+*) die "usage: pin [status | assh | kira | tpm2-verifier | go-uefi-slim | go-tui-slim]" ;;
 esac
