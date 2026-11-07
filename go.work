@@ -11,6 +11,7 @@ use (
 	./tpm2-verifier
 	./tpm2-kira/core
 	./go-uefi-slim
+	./go-tui-slim
 )
 
 // tpm2-kira and the vault each replace the core with their own copy
@@ -25,3 +26,7 @@ replace github.com/tpm2-trust/tpm2-verifier v0.0.0 => ./tpm2-verifier
 // go-uefi-slim, EFI variables and Secure Boot: aSSH's and tpm2-kira's
 // submodules - here the checkout.
 replace github.com/tpm2-trust/go-uefi-slim v0.0.0 => ./go-uefi-slim
+
+// go-tui-slim, a terminal's full screen, questions and secrets: tpm2-kira's and
+// the vault's submodules - here the checkout.
+replace github.com/tpm2-trust/go-tui-slim v0.0.0 => ./go-tui-slim

@@ -99,6 +99,7 @@ AGENTS.md applies inside it and goes into detail; this file is the map.
 | `safearch/` | a read-only, signed Arch image (mkosi) whose identity is aSSH's | shell, mkosi | images, releases (`build.sh`, `release.sh`) |
 | `tpm2-verifier/` | EK certificate chains of TPM vendors; the curated EK root store every project uses (`ekroots`: the vendor data embedded, checked against its signed manifest) | Go, `github.com/tpm2-trust/tpm2-verifier` | binaries, packages; a library |
 | `go-uefi-slim/` | UEFI for Go on Linux: EFI variables (`efivar`), Secure Boot's signature databases, signed updates and Authenticode, in what sbctl writes and reads, and unified kernel images (`uki`: sections, PCR 11's measurements, `.pcrsig`); the standard library and x/sys alone | Go, `github.com/tpm2-trust/go-uefi-slim` | a library |
+| `go-tui-slim/` | a terminal program's full screen and questions, and its secrets: `tui` (the screen, keys, text, held output), `prompt` (questions, a password into a locked buffer), `termguard` (the terminal given back on every way out), `secret` (wipe, locked buffers, a process locked in memory and not dumpable); knows nothing of its users; the standard library and x/sys alone | Go, `github.com/tpm2-trust/go-tui-slim` | a library |
 
 Where they are published: github.com/tpm2-trust/<directory>, this
 workspace as `tpm2-trust/tpm2-trust`. A pin only resolves for
@@ -117,6 +118,7 @@ flowchart LR
   VER["tpm2-verifier<br/>ekroots: the EK root store"]
   GOTPM["go-tpm<br/>upstream c395998 everywhere"]
   UEFI["go-uefi-slim<br/>EFI variables, Secure Boot"]
+  TUI["go-tui-slim<br/>full screen, questions, secrets"]
   KIRA -->|"submodule assh/ (pin)"| ASSH
   SAFE -->|"submodule assh/ (pin), the assh command"| ASSH
   KIRA --- CORE
@@ -126,6 +128,9 @@ flowchart LR
   ASSH & KIRA & VAULT --> GOTPM
   ASSH -->|"submodule go-uefi-slim/ (pin), persist"| UEFI
   KIRA -->|"submodule go-uefi-slim/ (pin), its variables, Secure Boot"| UEFI
+  KIRA -->|"submodule go-tui-slim/ (pin), control, prompts, secrets"| TUI
+  ASSH -->|"submodule go-tui-slim/ (pin), the process lock"| TUI
+  VAULT -->|"submodule go-tui-slim/ (pin), its control, secrets"| TUI
   VER --> GOTPM
 ```
 
@@ -138,6 +143,9 @@ flowchart LR
 | tpm2-kira-vault | the core's `attest/` and `vaultproto/` | submodule `tpm2-kira/`, `replace ./tpm2-kira/core` in go.mod | `./pin tpm2-kira` |
 | aSSH | go-uefi-slim's `efivar` (`persist`: its CA in an EFI variable), `uki` (PCR signatures) | submodule `assh/go-uefi-slim`, `replace ./go-uefi-slim` in go.mod (safearch's build of the command takes it nested: `assh/go-uefi-slim`) | `./pin go-uefi-slim` |
 | tpm2-kira | go-uefi-slim (its own EFI variables, Secure Boot, `uki`) | submodule `tpm2-kira/go-uefi-slim`, `replace ./go-uefi-slim` in go.mod (aSSH's replace does not reach it) | `./pin go-uefi-slim` |
+| aSSH | go-tui-slim's `secret` (the process locked in memory, not dumpable, before a PIN is read) | submodule `assh/go-tui-slim`, `replace ./go-tui-slim` in go.mod (safearch's build of the command takes it nested: `assh/go-tui-slim`) | `./pin go-tui-slim` |
+| tpm2-kira | go-tui-slim (`control`'s full screen, the prompts, the secrets' buffers) | submodule `tpm2-kira/go-tui-slim`, `replace ./go-tui-slim` in go.mod | `./pin go-tui-slim` |
+| tpm2-kira-vault | go-tui-slim (its `control`, prompts, secrets) | submodule `tpm2-kira-vault/go-tui-slim`, `replace ./go-tui-slim` in go.mod - its own, not nested through `tpm2-kira/`, so the vault's screen does not move with the core's pin | `./pin go-tui-slim` |
 | tpm2-kira's core (and so the phone and the vault) | tpm2-verifier's `ekroots` | submodule `tpm2-kira/tpm2-verifier`, `replace ../tpm2-verifier` in `core/go.mod` (and `./tpm2-verifier` in tpm2-kira's, `./tpm2-kira/tpm2-verifier` in the vault's) | `./pin tpm2-verifier` |
 | every Go module (aSSH, tpm2-kira, its core, the vault, tpm2-verifier) | go-tpm | one pseudo-version in each go.mod, the same everywhere: they end up in one binary; no `replace` of it anywhere; `./pin status` warns when they differ | by hand, in every module at once |
 
@@ -169,6 +177,11 @@ Rules of the direction:
   - What both need about UEFI goes into `go-uefi-slim`, generic, with its tests; never a copy in
     a project, never aSSH's.
   - NV indices stay with aSSH's `persist`.
+- **A terminal program's screen, questions and secrets go through `go-tui-slim`**, which
+  neither tpm2-kira nor the vault owns (the standard library and x/sys alone): `control`'s
+  full screen and line menus, every question, every password read into a locked buffer and
+  wiped, the process locked in memory. What both need of a terminal goes there, generic, with
+  its tests; never a copy in a project. A secret is never a Go string there.
 - **A new dependency between projects** gets a row in the tables above,
   a pin that `./pin status` shows (extend `pin`), and release builds that
   build the pin (`GOWORK=off`), not the checkout.
@@ -241,6 +254,7 @@ Test by what changed, and no more; the full proof belongs to the end of a batch.
 | `assh/` | its tests (`go test ./...`, swtpm); tpm2-kira's `make test-all` against it (`go.work`); safearch's `tests/run.sh` after `./pin assh` |
 | `tpm2-kira-vault/` | its tests; the vault steps of `tools/vmtest.py` at the end of the batch |
 | `go-uefi-slim/` | its tests (the immutable test as root on a VM); aSSH's and tpm2-kira's suites after `./pin go-uefi-slim` |
+| `go-tui-slim/` | its tests (the process lock's "covers" as root on a VM); aSSH's tests, tpm2-kira's `make test-all` and the vault's tests against it (`go.work`); after `./pin go-tui-slim`, safearch's `tests/run.sh` and the vmtest scenarios that drive `control` (setup) |
 | `tpm2-verifier/` | its tests; `core`'s and the vault's after `./pin tpm2-verifier` |
 | `safearch/` | `tests/run.sh`; `tests/vm.sh` at the end of the batch, when the boot changed |
 
