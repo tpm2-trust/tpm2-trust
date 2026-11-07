@@ -1,7 +1,7 @@
 # PLAN: go-tui-slim - a terminal's screen, questions and secrets, shared by tpm2-kira and the vault
 
 Status: **confirmed 2026-11-07** (the vault plan's option A, `tpm2-kira-vault/PLAN.md` on
-`feat/vault-control`); A1 done (`go-tui-slim` `134f1f1`, pushed), A2 in progress on the
+`feat/vault-control`); A1 done (`go-tui-slim` `134f1f1`, pushed), A2 done on the
 workspace's `feat/go-tui-slim`.
 
 ## Goal
@@ -15,7 +15,7 @@ as `go-uefi-slim` is for EFI variables.
 
 - [x] A1. The module: `tui`, `prompt` (decoupled from tpm2-kira's diskkey: `Prompter.SecretBuffer`),
       `termguard`, `secret` (`Wipe`, `LockedBuffer`, `LockProcess`), copies with their tests.
-- [ ] A2. The workspace: `go.work` uses and replaces it; `pin` (two submodule lines, `./pin
+- [x] A2. The workspace (`fa90cb7`): `go.work` uses and replaces it; `pin` (two submodule lines, `./pin
       go-tui-slim`, the AUR's `_tuislim`); AGENTS.md (the project's row, the diagram, the consumers,
       the rule, what to test).
 - [ ] A3. tpm2-kira switches over: the submodule `go-tui-slim/` and `replace ./go-tui-slim`;
