@@ -1,3 +1,67 @@
+# PLAN: rename tpm2-kira to kira, tpm2-kira-vault to kira-vault
+
+Status: **decided 2026-11-07: kinds 1, 2 and 3 (the labels too: every enrolment again, new known answers); the commands `kira`, `kira-boot`, `kira-vault`; the keys `KIRA_*`; A4 first.** Before the A4 VM test; A4 (go-tui-slim
+`panel`) is committed first, the rename comes on top of it.
+
+## Goal
+
+The projects are renamed on GitHub (`tpm2-trust/kira`, `tpm2-trust/kira-vault`); every reference in
+code, builds, docs and pins follows: the Go module paths, the workspace's directories, the submodules,
+`go.work`, `pin`, Marify's `core.properties`, the AUR recipe and the Debian packaging - and, by the
+owner's answer, what the installed system and the protocol carry.
+
+## What the name is today (counts of "tpm2-kira")
+
+- tpm2-kira 3509, the workspace 261, the vault 210, Marify 146, aSSH 42, go-uefi-slim 4,
+  tpm2-verifier 3, go-tui-slim 2, safearch 1.
+- Kinds:
+  1. **Names of the repositories and Go modules**: `github.com/tpm2-trust/tpm2-kira` (614 places),
+     `.../tpm2-kira/core`, `.../tpm2-kira-vault`; the directories, the submodules (the vault's
+     `tpm2-kira/`), `go.work`, `pin`, `core.properties`, PKGBUILD's sources.
+  2. **What the installed system carries**: the commands `tpm2-kira` and `tpm2-kira-boot` (236), the
+     units `tpm2-kira*.service` (90, `-close`, `-late-close`, `-machine-id`, `-unlock.socket`), the
+     mkinitcpio hook `sd-tpm2-kira` (105), the initramfs-tools scripts, `/etc/tpm2-kira` (196),
+     `/var/lib/tpm2-kira` (18), the keys `TPM2_KIRA_*` (359), the packages' names, the vault's
+     `tpm2-kira-vault.service` and `.container`, its admin socket.
+  3. **What the protocol and the disks carry**: 21 domain-separation labels (`tpm2-kira/qd/v1`, the
+     Noise prologue `tpm2-kira/v1`, `tpm2-kira/vault/release/v1`, the pepper's AAD, the boot key, the
+     keyboard pepper and layout), the LUKS2 token type `tpm2-kira` in each enrolled header, the BLE
+     device name `tpm2-kira`.
+- Not named after the project, unchanged: the EFI variables (`KIRA*`, the GUID), the NV indices,
+  Marify's name.
+
+## Steps
+
+- [ ] 1. A4 committed (go-tui-slim `61367e7`, tpm2-kira `feat/panel`, the workspace's PLAN).
+- [ ] 2. Kind 1 everywhere, on a branch `chore/rename` in each repository: module paths and imports,
+      `replace` lines, submodule URLs and paths (`git mv`), `go.work`, `pin` (its names and status),
+      `core.properties` and `build-core.sh`, PKGBUILD's and the workflows' URLs, the docs and AGENTS.md
+      files; the workspace's directories `kira/` and `kira-vault/` (and `.local`'s paths that name them).
+- [ ] 3. Kind 2 and 3 as answered.
+- [ ] 4. Tests: every module's tests, `make test-all`, safearch's `tests/run.sh`, the vault's, Marify's
+      build of the core; then the proof (both machines, from `fresh`, without `--fast-kdf`): the
+      image, the units and the paths are the boot's.
+- [ ] 5. The push order: the owner renames on GitHub first (GitHub redirects the old URLs, so nothing
+      pinned breaks in between), then pushes the branches; pins moved after the merges.
+
+## What breaks
+
+- Kind 1: nothing for a machine; a clone's remote URL (GitHub redirects); Go's module cache of the old
+  path.
+- Kind 2: an installed machine's package, units, hook, `/etc` and `/var/lib`: set up again (the
+  workspace's rule: no migration). `slot delete --sweep` reads nothing of these paths.
+- Kind 3: **every derived key and every enrolment**: the disks' tpm2-kira keyslots (enrolled again),
+  every phone (enrolled again), every vault enrolment; the known answers of every derivation get new
+  values - the owner's word (tpm2-kira's AGENTS.md: "a change of one changes enrolled disks' keys").
+
+## Decisions (the owner, 2026-11-07)
+
+1. All three kinds: the protocol's labels, the LUKS token type and the BLE name too.
+2. The commands `kira`, `kira-boot`, the vault's `kira-vault`; units, hook and paths after them
+   (`kira*.service`, `sd-kira`, `/etc/kira`, `/var/lib/kira`).
+3. The configuration keys `KIRA_*`.
+4. A4 committed first.
+
 # PLAN: go-tui-slim - a terminal's screen, questions and secrets, shared by tpm2-kira and the vault
 
 Status: **confirmed 2026-11-07** (the vault plan's option A, `tpm2-kira-vault/PLAN.md` on
@@ -24,9 +88,14 @@ as `go-uefi-slim` is for EFI variables.
       `PassphraseBuffer`; `internal/memlock` and aSSH's `sandbox.LockMemory` call
       `secret.LockProcess` (aSSH: the same submodule and pin); the PKGBUILD's `_tuislim`;
       `test-affected.py`; boot_binary_test's list. `make test-all`, the vmtest setup.
-- [ ] A4. The panel: control's screen (`control_screen.go`'s generic part: the state, the keys, the
-      frame, the loop) into a `panel` package of the module, typed on its own step and section types;
-      tpm2-kira's control fills it, with no visible change. Then the vault builds on it.
+- [x] A4. The panel (go-tui-slim `61367e7`, branch `feat/panel` there and in tpm2-kira): control's
+      screen (`control_screen.go`'s generic part: the state, the keys, the frame, the loop) into a
+      `panel` package of the module, typed on its own `Section` and `Step`; the program gives a
+      `Source` (header, sections, `Collect` in the background as functions the loop applies, `Run`).
+      tpm2-kira's control fills it (`controlPanel`), with no visible change: the frames of the old
+      and the new code byte for byte the same (every section in five states, four sizes, UTF-8 and
+      ASCII, the loading screen). Only tpm2-kira's pin moved: aSSH uses nothing of `panel`.
+      Then the vault builds on it.
 
 ## What breaks
 
