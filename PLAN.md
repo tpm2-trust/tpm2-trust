@@ -18,7 +18,7 @@ as `go-uefi-slim` is for EFI variables.
 - [x] A2. The workspace (`fa90cb7`): `go.work` uses and replaces it; `pin` (two submodule lines, `./pin
       go-tui-slim`, the AUR's `_tuislim`); AGENTS.md (the project's row, the diagram, the consumers,
       the rule, what to test).
-- [ ] A3. tpm2-kira switches over: the submodule `go-tui-slim/` and `replace ./go-tui-slim`;
+- [x] A3. tpm2-kira switches over (tpm2-kira `b815067`, aSSH `b7587d5`, safearch `336809f`, go-tui-slim `9dcc3a2`; `make test-all`, safearch 348/348): the submodule `go-tui-slim/` and `replace ./go-tui-slim`;
       `internal/tui`, `internal/prompt`, `internal/termguard`, `internal/wipe` go, their users take
       the module's (`wipe.Bytes` becomes `secret.Wipe`); prompt's secret buffer is diskkey's
       `PassphraseBuffer`; `internal/memlock` and aSSH's `sandbox.LockMemory` call
