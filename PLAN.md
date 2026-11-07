@@ -1,3 +1,24 @@
+# PLAN: `reveal` goes; `slot add` shows the first code
+
+Status: **confirmed 2026-11-07, done 2026-11-07; nothing pushed. Branch `chore/reveal-cleanup` in tpm2-kira and the workspace.**
+
+## Goal
+
+The owner's request: clean up what no longer makes sense, the TOTP codes shown on the running system above all. Since the close (PCR 15) no slot's TOTP key computes on a booted system, so `reveal` and `reveal-plain` (tpm2-kira and tpm2-kira-boot) show "closed" except between the first `slot add` and the first boot through the image. That one use, checking the authenticator against the TPM's code, moves into `slot add`. The commands, the code only they use, and the hints and docs that point to them go.
+
+## Steps
+
+- [x] 1. `slot add`: after a new TOTP key is sealed, the slot's current code once (`totp.SlotCode`) to compare with the authenticator; when the TPM computes none (this boot closed, past the separator, another state), why, and that the first code is on the next boot's screen. The SHA-256 note says the same.
+- [x] 2. Remove `reveal`, `reveal-plain` from `tpm2-kira` and `tpm2-kira-boot`, their help; `totp.RevealCommand`, `PrintKIRASlots`, `PrintPlainSlots`, `FormatKIRAOutput`, `HasValidSlots` and what only they use; their tests.
+- [x] 3. `slot info`'s last line; the hook's comment.
+- [x] 4. Docs: README, CODE, SEALING, SLOT, TROUBLESHOOTING, ARCHITECTURE, DISK-KEY, SECURITY-BACKGROUND.
+- [x] 5. `vmtest.py`: the setup's check reads the code from `slot add`; the boot's check that the key refuses after the close, by `slot status`/`status`, which say "closed until the next boot".
+- [x] 6. Tests: `make test-all` PASS (995); `setup` and `typed-boot` on both machines PASS (`--fast-kdf`), `setup` on Arch again after the message's wording. Found: neither VM computes a first code at `slot add` (Arch: past the OS separator; Debian: PCR 15 not zero on the fresh system); `slot add` says so, and the first code is the boot screen's.
+
+## What breaks
+
+`tpm2-kira reveal`, `reveal-plain` and `tpm2-kira-boot reveal` are gone: "unknown command". A script that calls them breaks; in the workspace only `vmtest.py`, changed here. Nothing a slot holds changes.
+
 # PLAN: Secure Boot's state after systemd's OS separator; a slot on SHA-1 is a warning
 
 Status: **started 2026-11-04, branch `feat/secureboot-sha1` in tpm2-kira, marify and tpm2-kira-vault. Nothing pushed.**
