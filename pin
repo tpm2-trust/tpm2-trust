@@ -51,6 +51,16 @@ die() {
 short() { git -C "$1" rev-parse --short "$2"; }
 dirty() { [[ -n "$(git -C "$1" status --porcelain)" ]]; }
 
+# same_tree REPO SHA HEAD: SHA is on HEAD's history and has HEAD's tree - HEAD is a
+# merge of it that adds nothing (a PR merged with a merge commit), so a pin of SHA is
+# current: moving it to HEAD would change no byte, and only start the next round.
+same_tree() {
+    local repo=$1 sha=$2 head=$3
+    git -C "$repo" cat-file -e "$sha^{commit}" 2>/dev/null &&
+        git -C "$repo" merge-base --is-ancestor "$sha" "$head" &&
+        [[ "$(git -C "$repo" rev-parse "$sha^{tree}")" == "$(git -C "$repo" rev-parse "$head^{tree}")" ]]
+}
+
 # where REPO SHA HEAD: how SHA stands to REPO's HEAD.
 where() {
     local repo=$1 sha=$2
@@ -58,6 +68,8 @@ where() {
     head="$(git -C "$repo" rev-parse HEAD)"
     if [[ $sha == "$head" ]]; then
         green "at its HEAD"
+    elif same_tree "$repo" "$sha" "$head"; then
+        green "at its HEAD's tree (HEAD $(short "$repo" "$head") merges it)"
     elif ! git -C "$repo" cat-file -e "$sha^{commit}" 2>/dev/null; then
         red "a commit $repo does not have (made in the submodule? fetch it into $repo)"
     elif git -C "$repo" merge-base --is-ancestor "$sha" "$head"; then
@@ -172,6 +184,12 @@ pin_submodules() {
             continue
         fi
         dirty "$ROOT/$consumer/$path" && die "$consumer/$path has changes of its own: move them to $co/ first"
+        local recorded
+        recorded="$(git -C "$ROOT/$consumer" ls-tree HEAD "$path" | awk '{print $3}')"
+        if [[ -n $recorded ]] && same_tree "$ROOT/$co" "$recorded" "$sha"; then
+            echo "$consumer: $path at $(short "$ROOT/$co" "$recorded"), the tree of $co's HEAD already: nothing to move"
+            continue
+        fi
         git -C "$ROOT/$consumer/$path" fetch -q --no-recurse-submodules "$ROOT/$checkout" "+refs/heads/*:refs/remotes/workspace/*"
         git -C "$ROOT/$consumer/$path" checkout -q --detach "$sha"
         nested "$ROOT/$consumer/$path"

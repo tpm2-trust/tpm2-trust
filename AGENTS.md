@@ -240,6 +240,13 @@ change: which former functionality breaks, and what the owner has to redo.
   pins and set with its `_tag` at a release.
 - **Pinning is staging.** `pin` never commits; the commit of a new pin is
   the consuming project's, with its tests run against it.
+- **A pin is current at its project's HEAD's tree.** A PR merged with a merge
+  commit moves HEAD and changes no byte: a pin of the merged branch's commit has
+  HEAD's tree, `pin status` shows it green, and `./pin` leaves it (the owner,
+  2026-11-08). So one push round carries a whole batch: the consumers pin the
+  branches' commits, and the merges keep them current. Merge with a merge commit,
+  never a squash or a rebase: those make new commits, and the pins name none of
+  them.
 
 ### What to test after a change
 
