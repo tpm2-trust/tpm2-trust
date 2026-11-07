@@ -1,3 +1,79 @@
+# PLAN: control cleaned up; a sweep of everything tpm2-kira left in the TPM and the EFI variables
+
+Status: **decided 2026-11-07: the rule amended, everything in scope (TPM, EFI variables, /etc/tpm2-kira, /var/lib/tpm2-kira, the LUKS keyslots), all of aSSH's CA handles; `slot delete --yes --sweep`.** In progress: the VM's removal scenario. Branches `feat/control-cleanup`, then `feat/control-sweep`, in tpm2-kira.
+
+## Goal
+
+1. `control` is not quite clean after the full screen came in. Three dead functions: `collectFacts`
+   (replaced by fast and slow facts), `prompt.runeCells`, `tui.Screen.Glyphs`. Two vocabularies for
+   the same parts: the line menus say "Step 1 of 2", "Signing key and TOTP codes", "Attestation by
+   phone"; the full screen says "Boot chain", "Keys & slots", "Phone". `controlMenus` and
+   `controlSections` hold the same intros twice. The line menus should be the sections, with their
+   names.
+2. A step in `control`, behind a typed confirmation, that removes everything this or any earlier
+   version of tpm2-kira left in the TPM and the EFI variables - for a machine handed on, or set up
+   again from scratch.
+
+## What a sweep finds (from the code and the history)
+
+- **NV indices in tpm2-kira's own range, 0x01803000-0x01803FFF** (`nvslot.AppNVRAMStart`/`End`), whatever
+  layout put them there:
+  - today: boot settings 0x01803000, slots 0x01803010-1F, generation indices 0x018038xx, attest counters
+    from 0x01803820;
+  - earlier versions: the attestation blobs 0x01803020-2F (before f0c5b77), slots beyond 0x0180301F.
+  - It goes by place, not by format: nothing of an old format is read or understood.
+- **aSSH's NV indices of tpm2-kira's SSH CA**: the PIN and counter indices 0x01802912/13, the SHA-1
+  index 0x01802914, the window index 0x01802915 of aSSH before d21cdb0 - through aSSH's own removal
+  (`removeSSHCA`, `persist`), which tpm2-kira already calls.
+- **EFI variables under tpm2-kira's GUID 67f474ef-...**: KIRAslot0-15, KIRAmachineID, KIRAcloseReboot,
+  and any other name under that GUID (one GUID since fe8ae22, 2026-10-30; nothing earlier was in EFI
+  variables). aSSH's KIRAasshCA through aSSH.
+- Not in the TPM or the EFI variables, so not swept unless decided (question 2): /etc/tpm2-kira (keys,
+  control.conf, assh.conf, the PIN, pcr.key), /var/lib/tpm2-kira (recovery blobs, firmware names), the
+  LUKS keyslots with a tpm2-kira token.
+
+## Steps
+
+- [x] 1. Clean up (`90f8b6f`, branch `feat/control-cleanup`): the three dead functions go; the line menus show the sections by their names
+      (the boot chain first, then the Overview with a line per section); one intro per section;
+      CONTROL.md, help, vmtest's picks follow.
+- [x] 2. `admin.Sweep` (the model: `SweepFindings` - each found thing with its place, what it is if
+      tpm2-kira knows it, "of another shape" when not): lists first, removes second. NV indices through
+      aSSH's `persist` as every removal does (`TakeForeign` for what is not tpm2-kira's shape at its
+      place, as `slot delete --force`); the SSH CA through `removeSSHCA`; EFI variables through
+      `efivars.Remove`, every name under the GUID.
+- [x] 3. "Delete everything" (`slot delete --yes`, and its step in Keys & slots) stays and is
+      extended (the owner, 2026-11-07: no replacement): today it removes every slot with its record,
+      leftover attest counters, the boot settings, the SSH CA and the sealed machine-id; it does not
+      remove other indices in 0x01803000-0x01803FFF (earlier layouts), KIRAcloseReboot and other names
+      under the GUID, aSSH's old window index 0x01802915. The sweep adds those, listed first like the rest.
+- [x] 4. Tests (the removal scenario PASS on both, `.local/runs/sweep-vmtest`): unit tests of the findings against a software TPM with indices of today's, earlier
+      layouts and another shape, and an EFI variable directory (efivars.SetDir); the control step with
+      fake answers (no word, no removal); vmtest: the removal scenario sweeps and finds nothing after.
+- [x] 5. Docs: CONTROL.md, SLOT.md (what tpm2-kira keeps where), the help page.
+
+## WARNING: a standing rule
+
+tpm2-kira's AGENTS.md says: "No migration paths ... no cleanup code for what earlier versions left
+behind". This sweep is cleanup of what earlier versions left. It reads no old format and keeps
+nothing working - it removes by place (tpm2-kira's NV range, its GUID). The rule needs one sentence
+to allow exactly that: "a removal by place (tpm2-kira's NV range and GUID), whatever wrote there, is
+not a migration".
+
+## What breaks
+
+Nothing until the step is used. Used, it does what it says: every slot, phone, phone salt, vault part
+and the SSH CA are gone; tpm2-kira's LUKS keyslots open nothing; the recovery passphrase stays.
+
+## Open questions
+
+1. The rule above: amend tpm2-kira's AGENTS.md as proposed?
+2. Scope: the TPM and the EFI variables alone (as asked), or also offer, in the same step and each
+   asked separately, /etc/tpm2-kira, /var/lib/tpm2-kira and the LUKS keyslots with a tpm2-kira token?
+3. The command: `slot delete --yes --sweep`, or a new `tpm2-kira sweep [--list]`?
+4. aSSH's indices and KIRAasshCA: only when they are tpm2-kira's CA (assh.conf names them), or
+   everything at aSSH's default handles too (another program using aSSH would lose its CA)?
+
 # PLAN: `tpm2-kira control` as one full-screen terminal UI, every option in one place
 
 Status: **done 2026-11-07** ("implement all recommended things": the seven questions as recommended);
