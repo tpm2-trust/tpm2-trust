@@ -1,3 +1,38 @@
+# PLAN: go-tui-slim - a terminal's screen, questions and secrets, shared by tpm2-kira and the vault
+
+Status: **confirmed 2026-11-07** (the vault plan's option A, `tpm2-kira-vault/PLAN.md` on
+`feat/vault-control`); A1 done (`go-tui-slim` `134f1f1`, pushed), A2 in progress on the
+workspace's `feat/go-tui-slim`.
+
+## Goal
+
+The vault gets a control panel like tpm2-kira's. The vault may depend only on tpm2-kira's core,
+and Go forbids importing tpm2-kira's `internal/` from another module, so what both need of a
+terminal goes into a module neither owns: `go-tui-slim` (the standard library and x/sys alone),
+as `go-uefi-slim` is for EFI variables.
+
+## Steps
+
+- [x] A1. The module: `tui`, `prompt` (decoupled from tpm2-kira's diskkey: `Prompter.SecretBuffer`),
+      `termguard`, `secret` (`Wipe`, `LockedBuffer`, `LockProcess`), copies with their tests.
+- [ ] A2. The workspace: `go.work` uses and replaces it; `pin` (two submodule lines, `./pin
+      go-tui-slim`, the AUR's `_tuislim`); AGENTS.md (the project's row, the diagram, the consumers,
+      the rule, what to test).
+- [ ] A3. tpm2-kira switches over: the submodule `go-tui-slim/` and `replace ./go-tui-slim`;
+      `internal/tui`, `internal/prompt`, `internal/termguard`, `internal/wipe` go, their users take
+      the module's (`wipe.Bytes` becomes `secret.Wipe`); prompt's secret buffer is diskkey's
+      `PassphraseBuffer`; `internal/memlock` and aSSH's `sandbox.LockMemory` call
+      `secret.LockProcess` (aSSH: the same submodule and pin); the PKGBUILD's `_tuislim`;
+      `test-affected.py`; boot_binary_test's list. `make test-all`, the vmtest setup.
+- [ ] A4. The panel: control's screen (`control_screen.go`'s generic part: the state, the keys, the
+      frame, the loop) into a `panel` package of the module, typed on its own step and section types;
+      tpm2-kira's control fills it, with no visible change. Then the vault builds on it.
+
+## What breaks
+
+Nothing for a person: the same screens. Builds need the new submodule (`--recurse-submodules`; the
+AUR recipe's `_tuislim`).
+
 # PLAN: control cleaned up; a sweep of everything tpm2-kira left in the TPM and the EFI variables
 
 Status: **decided 2026-11-07: the rule amended, everything in scope (TPM, EFI variables, /etc/tpm2-kira, /var/lib/tpm2-kira, the LUKS keyslots), all of aSSH's CA handles; `slot delete --yes --sweep`.** In progress: the VM's removal scenario. Branches `feat/control-cleanup`, then `feat/control-sweep`, in tpm2-kira.

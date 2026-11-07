@@ -16,6 +16,8 @@
 #                       to tpm2-verifier's HEAD
 #   ./pin go-uefi-slim  assh/go-uefi-slim and tpm2-kira/go-uefi-slim (EFI
 #                       variables, Secure Boot) to go-uefi-slim's HEAD
+#   ./pin go-tui-slim   tpm2-kira/go-tui-slim and tpm2-kira-vault/go-tui-slim
+#                       (the full screen, questions, secrets) to go-tui-slim's HEAD
 #
 # go-tpm is required in every Go module's go.mod: shown, compared - one
 # version for all - and moved by hand. So are the AUR recipe's commits of
@@ -33,6 +35,8 @@ SUBMODULES=(
     "tpm2-kira tpm2-verifier tpm2-verifier"
     "assh go-uefi-slim go-uefi-slim"
     "tpm2-kira go-uefi-slim go-uefi-slim"
+    "tpm2-kira go-tui-slim go-tui-slim"
+    "tpm2-kira-vault go-tui-slim go-tui-slim"
 )
 
 red() { printf '\033[31m%s\033[0m' "$*"; }
@@ -68,7 +72,7 @@ GOTPM_MODULES=(assh tpm2-kira tpm2-kira/core tpm2-kira-vault tpm2-verifier)
 # The AUR recipe builds from GitHub's tarballs, which leave submodules out, so
 # it names each submodule's commit itself: "variable path".
 AUR_PKGBUILD=tpm2-kira/packaging/aur/PKGBUILD
-AUR_PINS=("_assh assh" "_verifier tpm2-verifier" "_uefislim go-uefi-slim")
+AUR_PINS=("_assh assh" "_verifier tpm2-verifier" "_uefislim go-uefi-slim" "_tuislim go-tui-slim")
 
 # aur_status shows the recipe's commits against the submodules tpm2-kira's HEAD
 # records. Nothing moves them: they are set with the recipe's _tag, at a release.
@@ -185,6 +189,7 @@ status) status ;;
 assh) pin_submodules assh ;;
 tpm2-verifier) pin_submodules tpm2-verifier ;;
 go-uefi-slim) pin_submodules go-uefi-slim ;;
+go-tui-slim) pin_submodules go-tui-slim ;;
 tpm2-kira) pin_kira ;;
-*) die "usage: pin [status | assh | tpm2-kira | tpm2-verifier | go-uefi-slim]" ;;
+*) die "usage: pin [status | assh | tpm2-kira | tpm2-verifier | go-uefi-slim | go-tui-slim]" ;;
 esac
